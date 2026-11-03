@@ -42,11 +42,33 @@ function cookieDiagnostics() {
   xhr.ontimeout = function(){notice('Mazepa cookie: таймаут');};
   xhr.send();
 }
+function ownSessionProbe() {
+  notice('Mazepa: перевірка власної сесії Lampa...');
+  function request(path, done) {
+    var x = new XMLHttpRequest();
+    x.open('GET', HOME + path, true);
+    x.withCredentials = true;
+    x.timeout = 12000;
+    x.onload = function(){done(null, x);};
+    x.onerror = function(){done('CORS/мережа');};
+    x.ontimeout = function(){done('таймаут');};
+    x.send();
+  }
+  request('login.php?mzprobe=' + Date.now(), function(err, first) {
+    if (err) {notice('Mazepa: login.php — ' + err);return;}
+    request('tracker.php?mzprobe=' + Date.now(), function(err2, second) {
+      if (err2) {notice('Mazepa: tracker.php — ' + err2);return;}
+      var body = second.responseText || '';
+      var login = /login_username|login_password/i.test(body) || /login\\.php/i.test(second.responseURL || '');
+      notice('Mazepa: login HTTP ' + first.status + ', tracker HTTP ' + second.status + '; ' + (login ? 'вхід потрібен' : 'перевір сторінку'));
+    });
+  });
+}
 function openMenu() {
   Lampa.Select.show({
     title: 'Mazepa',
-    items: [{title:'Перевірити сесію Mazepa.to', id:'session'},{title:'Діагностика cookies', id:'cookie'}],
-    onSelect: function(item) { if (item && item.id === 'session') sessionCheck(); else if (item && item.id === 'cookie') cookieDiagnostics(); },
+    items: [{title:'Перевірити сесію Mazepa.to', id:'session'},{title:'Діагностика cookies', id:'cookie'},{title:'Тест власної сесії', id:'own'}],
+    onSelect: function(item) { if (item && item.id === 'session') sessionCheck(); else if (item && item.id === 'cookie') cookieDiagnostics(); else if (item && item.id === 'own') ownSessionProbe(); },
     onBack: function() {}
   });
 }
