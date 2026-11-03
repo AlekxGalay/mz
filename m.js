@@ -3,6 +3,48 @@
 if (window.mazepaPluginM1) return;
 window.mazepaPluginM1 = true;
 var HOME = 'https://mazepa.to/';
+var mzTrace = [];
+var mzTraceActive = false;
+function mzLog(type, detail) {
+  if (!mzTraceActive) return;
+  mzTrace.push(new Date().toISOString() + ' | ' + type + (detail ? ' | ' + detail : ''));
+  if (mzTrace.length > 150) mzTrace.shift();
+}
+function mzKey(event) {
+  if (!mzTraceActive) return;
+  var code = event.keyCode || event.which;
+  var names = {8:'BACK',27:'BACK/ESC',13:'OK',37:'LEFT',38:'UP',39:'RIGHT',40:'DOWN',461:'WEBOS_BACK',10009:'TV_BACK'};
+  if (names[code]) mzLog('KEY', names[code] + ' (' + code + ')');
+}
+function mzEnableTrace() {
+  mzTraceActive = true;
+  mzTrace = [];
+  mzLog('TRACE','enabled');
+  notice('Mazepa: діагностику увімкнено');
+}
+function mzDisableTrace() {
+  mzLog('TRACE','disabled');
+  mzTraceActive = false;
+  notice('Mazepa: діагностику вимкнено');
+}
+function mzShowTrace() {
+  var output = mzTrace.join('\\n') || 'Журнал порожній';
+  try {
+    var el = document.createElement('textarea');
+    el.value = output;
+    el.style.cssText = 'position:fixed;top:8%;left:5%;width:90%;height:75%;z-index:999999;background:#111;color:#fff;font-size:17px;padding:12px;';
+    el.readOnly = true;
+    document.body.appendChild(el);
+    var btn = document.createElement('button');
+    btn.textContent = 'Закрити журнал';
+    btn.style.cssText = 'position:fixed;bottom:5%;left:5%;z-index:999999;font-size:20px;padding:12px;';
+    btn.onclick = function(){el.remove();btn.remove();};
+    document.body.appendChild(btn);
+    btn.focus();
+  } catch(e) {notice('Mazepa: журнал недоступний');}
+}
+document.addEventListener('keydown', mzKey, true);
+
 function notice(message) {
   try { if (window.Lampa && Lampa.Noty) Lampa.Noty.show(message); } catch (e) {}
 }
@@ -81,6 +123,7 @@ function workerProbe() {
 }
 var API = 'https://mz-api.galajalexej.workers.dev';
 function pairDevice() {
+  mzLog('ACTION','create pairing code');
   var x = new XMLHttpRequest();
   x.open('POST', API + '/pair/start', true);
   x.timeout = 12000;
@@ -100,6 +143,7 @@ function pairDevice() {
   x.send('{}');
 }
 function showSavedPairCode() {
+  mzLog('SCREEN','pair code');
   var code = localStorage.getItem('mz_pair_code');
   var expires = Number(localStorage.getItem('mz_pair_expires') || 0);
   if (!code || Date.now() > expires) {
@@ -109,11 +153,12 @@ function showSavedPairCode() {
   Lampa.Select.show({
     title: 'Код прив’язки: ' + code,
     items: [{title:'КОД: ' + code, subtitle:'Запиши код. Дійсний 5 хвилин', id:'code'},{title:'Перевірити прив’язку', id:'check'}],
-    onSelect: function(item){if(item && item.id === 'check') pairStatus();},
-    onBack: function(){ openMenu(); }
+    onSelect: function(item){mzLog('SELECT','pair screen: ' + (item && item.id)); if(item && item.id === 'check') pairStatus();},
+    onBack: function(){ mzLog('BACK','pair screen -> main menu'); openMenu(); }
   });
 }
 function pairStatus() {
+  mzLog('ACTION','check pairing');
   var secret = localStorage.getItem('mz_device_secret');
   if (!secret) { notice('Спочатку створи код прив’язки'); return; }
   var x = new XMLHttpRequest();
@@ -134,10 +179,11 @@ function pairStatus() {
   x.send(JSON.stringify({device_secret:secret}));
 }
 function openMenu() {
+  mzLog('SCREEN','main menu opened');
   Lampa.Select.show({
     title: 'Mazepa',
-    items: [{title:'Перевірити сесію Mazepa.to', id:'session'},{title:'Діагностика cookies', id:'cookie'},{title:'Тест власної сесії', id:'own'},{title:'Перевірити Cloudflare Worker', id:'worker'},{title:'Створити код прив’язки', id:'pair'},{title:'Показати код прив’язки', id:'show_pair'},{title:'Перевірити прив’язку', id:'pair_status'}],
-    onSelect: function(item) { if (item && item.id === 'session') sessionCheck(); else if (item && item.id === 'cookie') cookieDiagnostics(); else if (item && item.id === 'own') ownSessionProbe(); else if (item && item.id === 'worker') workerProbe(); else if (item && item.id === 'pair') pairDevice(); else if (item && item.id === 'show_pair') showSavedPairCode(); else if (item && item.id === 'pair_status') pairStatus(); }
+    items: [{title:'Перевірити сесію Mazepa.to', id:'session'},{title:'Діагностика cookies', id:'cookie'},{title:'Тест власної сесії', id:'own'},{title:'Перевірити Cloudflare Worker', id:'worker'},{title:'Створити код прив’язки', id:'pair'},{title:'Показати код прив’язки', id:'show_pair'},{title:'Перевірити прив’язку', id:'pair_status'},{title:'Увімкнути діагностику', id:'trace_on'},{title:'Показати журнал', id:'trace_show'},{title:'Вимкнути діагностику', id:'trace_off'}],
+    onSelect: function(item) { mzLog('SELECT', item && item.id ? item.id : 'unknown'); if (item && item.id === 'trace_on') mzEnableTrace(); else if (item && item.id === 'trace_show') mzShowTrace(); else if (item && item.id === 'trace_off') mzDisableTrace(); else if (item && item.id === 'session') sessionCheck(); else if (item && item.id === 'cookie') cookieDiagnostics(); else if (item && item.id === 'own') ownSessionProbe(); else if (item && item.id === 'worker') workerProbe(); else if (item && item.id === 'pair') pairDevice(); else if (item && item.id === 'show_pair') showSavedPairCode(); else if (item && item.id === 'pair_status') pairStatus(); }
   });
 }
 function init() {
