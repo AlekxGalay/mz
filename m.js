@@ -229,6 +229,27 @@ function publicTrackerPreview() {
   x.ontimeout = function(){notice('Mazepa: таймаут каталогу');};
   x.send();
 }
+function requestMazepaTorrent(item) {
+  var token = localStorage.getItem('mz_device_token');
+  if (!token) { notice('Mazepa: потрібно прив’язати телевізор'); return; }
+  notice('Mazepa: завантаження торрент-файлу...');
+  var xhr = new XMLHttpRequest();
+  xhr.open('POST', API + '/mazepa/torrent', true);
+  xhr.responseType = 'arraybuffer';
+  xhr.timeout = 30000;
+  xhr.setRequestHeader('Content-Type', 'application/json');
+  xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+  xhr.onload = function() {
+    if (xhr.status !== 200) {
+      notice('Mazepa: torrent API HTTP ' + xhr.status);
+      return;
+    }
+    notice('Mazepa: torrent отримано (' + xhr.response.byteLength + ' байт)');
+  };
+  xhr.onerror = function() { notice('Mazepa: мережева помилка завантаження'); };
+  xhr.ontimeout = function() { notice('Mazepa: таймаут завантаження'); };
+  xhr.send(JSON.stringify({id: item.torrentId}));
+}
 function searchMazepa(query) {
   query = String(query || '').trim();
   if (!query) {notice('Mazepa: введи назву фільму або серіалу'); return;}
@@ -261,7 +282,7 @@ function searchMazepa(query) {
       title:'Mazepa: ' + query + ' (' + releases.length + ')',
       items:items,
       onSelect:function(item) {
-        if (item) notice('Mazepa: реліз ' + item.torrentId + ' знайдено; запуск TorrServer ще не підключений');
+        if (item) requestMazepaTorrent(item);
       },
       onBack:function(){openMenu();}
     });
