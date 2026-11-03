@@ -229,12 +229,66 @@ function publicTrackerPreview() {
   x.ontimeout = function(){notice('Mazepa: таймаут каталогу');};
   x.send();
 }
+function searchMazepa(query) {
+  query = String(query || '').trim();
+  if (!query) {notice('Mazepa: введи назву фільму або серіалу'); return;}
+  var token = localStorage.getItem('mz_device_token');
+  if (!token) {notice('Mazepa: спочатку прив’яжи телевізор'); return;}
+  localStorage.setItem('mz_last_query', query);
+  notice('Mazepa: шукаємо «' + query + '»...');
+  var x = new XMLHttpRequest();
+  x.open('POST', API + '/mazepa/search', true);
+  x.timeout = 30000;
+  x.setRequestHeader('Content-Type', 'application/json');
+  x.setRequestHeader('Authorization', 'Bearer ' + token);
+  x.onload = function() {
+    var data;
+    try {data = JSON.parse(x.responseText || '{}');}
+    catch(e) {notice('Mazepa: некоректна відповідь Worker');return;}
+    if (x.status !== 200 || data.error) {
+      notice('Mazepa: ' + (data.error || 'HTTP ' + x.status));
+      return;
+    }
+    var releases = Array.isArray(data.results) ? data.results : [];
+    if (!releases.length) {
+      notice('Mazepa: за запитом «' + query + '» нічого не знайдено (' + (data.html_size || 0) + ' символів HTML)');
+      return;
+    }
+    var items = releases.map(function(r, i) {
+      return {title:r.title || ('Реліз ' + r.id), subtitle:'Mazepa ID: ' + r.id, id:'item' + i, torrentId:String(r.id)};
+    });
+    Lampa.Select.show({
+      title:'Mazepa: ' + query + ' (' + releases.length + ')',
+      items:items,
+      onSelect:function(item) {
+        if (item) notice('Mazepa: реліз ' + item.torrentId + ' знайдено; запуск TorrServer ще не підключений');
+      },
+      onBack:function(){openMenu();}
+    });
+  };
+  x.onerror = function(){notice('Mazepa: немає зв’язку з Worker');};
+  x.ontimeout = function(){notice('Mazepa: пошук перевищив 30 секунд');};
+  x.send(JSON.stringify({query:query}));
+}
+function searchMazepaPrompt() {
+  if (!Lampa.Input || !Lampa.Input.edit) {
+    notice('Mazepa: клавіатура Lampa недоступна');
+    return;
+  }
+  Lampa.Input.edit({
+    value:localStorage.getItem('mz_last_query') || '',
+    free:true
+  }, function(value) {
+    if (String(value || '').trim()) searchMazepa(value);
+    else openMenu();
+  });
+}
 function openMenu() {
   mzLog('SCREEN','main menu opened');
   Lampa.Select.show({
     title: 'Mazepa',
-    items: [{title:'Відкритий каталог Mazepa (тест)', id:'catalog'},{title:'Перевірити сесію Mazepa.to', id:'session'},{title:'Діагностика cookies', id:'cookie'},{title:'Тест власної сесії', id:'own'},{title:'Перевірити Cloudflare Worker', id:'worker'},{title:'Створити код прив’язки', id:'pair'},{title:'Показати код прив’язки', id:'show_pair'},{title:'Перевірити прив’язку', id:'pair_status'},{title:'Увімкнути діагностику', id:'trace_on'},{title:'Показати журнал', id:'trace_show'},{title:'Вимкнути діагностику', id:'trace_off'}],
-    onSelect: function(item) { mzLog('SELECT', item && item.id ? item.id : 'unknown'); if (item && item.id === 'trace_on') mzEnableTrace(); else if (item && item.id === 'trace_show') mzShowTrace(); else if (item && item.id === 'trace_off') mzDisableTrace(); else if (item && item.id === 'catalog') publicTrackerPreview(); else if (item && item.id === 'session') sessionCheck(); else if (item && item.id === 'cookie') cookieDiagnostics(); else if (item && item.id === 'own') ownSessionProbe(); else if (item && item.id === 'worker') workerProbe(); else if (item && item.id === 'pair') pairDevice(); else if (item && item.id === 'show_pair') showSavedPairCode(); else if (item && item.id === 'pair_status') pairStatus(); }
+    items: [{title:'Пошук торрентів Mazepa', id:'search'},{title:'Повторити останній пошук', id:'search_again'},{title:'Відкритий каталог Mazepa (тест)', id:'catalog'},{title:'Перевірити сесію Mazepa.to', id:'session'},{title:'Діагностика cookies', id:'cookie'},{title:'Тест власної сесії', id:'own'},{title:'Перевірити Cloudflare Worker', id:'worker'},{title:'Створити код прив’язки', id:'pair'},{title:'Показати код прив’язки', id:'show_pair'},{title:'Перевірити прив’язку', id:'pair_status'},{title:'Увімкнути діагностику', id:'trace_on'},{title:'Показати журнал', id:'trace_show'},{title:'Вимкнути діагностику', id:'trace_off'}],
+    onSelect: function(item) { mzLog('SELECT', item && item.id ? item.id : 'unknown'); if (item && item.id === 'trace_on') mzEnableTrace(); else if (item && item.id === 'trace_show') mzShowTrace(); else if (item && item.id === 'trace_off') mzDisableTrace(); else if (item && item.id === 'search') searchMazepaPrompt(); else if (item && item.id === 'search_again') searchMazepa(localStorage.getItem('mz_last_query')); else if (item && item.id === 'catalog') publicTrackerPreview(); else if (item && item.id === 'session') sessionCheck(); else if (item && item.id === 'cookie') cookieDiagnostics(); else if (item && item.id === 'own') ownSessionProbe(); else if (item && item.id === 'worker') workerProbe(); else if (item && item.id === 'pair') pairDevice(); else if (item && item.id === 'show_pair') showSavedPairCode(); else if (item && item.id === 'pair_status') pairStatus(); }
   });
 }
 function init() {
