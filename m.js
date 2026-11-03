@@ -303,7 +303,8 @@ function requestMazepaTorrent(item) {
           if (!files.length) return false;
           var play = function(file) {
             try {
-              var url = 'http://192.168.0.110:8090/play/' + encodeURIComponent(status.hash) + '/' + encodeURIComponent(file.id);
+              var filename = String(file.path || 'video.mkv').split(/[\\/]/).pop();
+              var url = 'http://192.168.0.110:8090/stream/' + encodeURIComponent(filename) + '?link=' + encodeURIComponent(status.hash) + '&index=' + encodeURIComponent(file.id) + '&play';
               Lampa.Player.play({url:url,title:file.path || item.title});
             } catch(e) {notice('Mazepa: помилка відкриття плеєра');}
           };
