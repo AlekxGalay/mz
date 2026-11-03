@@ -244,7 +244,19 @@ function requestMazepaTorrent(item) {
       notice('Mazepa: torrent API HTTP ' + xhr.status);
       return;
     }
-    notice('Mazepa: torrent отримано (' + xhr.response.byteLength + ' байт)');
+    notice('Mazepa: передаємо торрент у TorrServer...');
+    var form = new FormData();
+    form.append('file', new Blob([xhr.response], {type:'application/x-bittorrent'}), 'release.torrent');
+    form.append('save', '1');
+    var up = new XMLHttpRequest();
+    up.open('POST', 'http://192.168.0.110:8090/torrent/upload', true);
+    up.timeout = 60000;
+    up.onload = function() {
+      notice('TorrServer: відповідь HTTP ' + up.status);
+    };
+    up.onerror = function(){notice('TorrServer: мережа або CORS');};
+    up.ontimeout = function(){notice('TorrServer: таймаут');};
+    up.send(form);
   };
   xhr.onerror = function() { notice('Mazepa: мережева помилка завантаження'); };
   xhr.ontimeout = function() { notice('Mazepa: таймаут завантаження'); };
