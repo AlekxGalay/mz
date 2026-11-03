@@ -269,6 +269,70 @@ function configureTorrserverAuth() {
     });
   });
 }
+var mzPlaybackMonitor = null;
+var mzPlaybackSamples = [];
+function startPlaybackMonitor(hash) {
+  if (mzPlaybackMonitor) clearInterval(mzPlaybackMonitor);
+  mzPlaybackSamples = [];
+  try {localStorage.removeItem('mz_playback_samples');} catch(e) {}
+  var count = 0;
+  function sample() {
+    count++;
+    if (count > 60) {
+      clearInterval(mzPlaybackMonitor);
+      mzPlaybackMonitor = null;
+      return;
+    }
+    var x = new XMLHttpRequest();
+    x.open('POST','http://192.168.0.110:8090/torrents',true);
+    x.timeout = 4500;
+    x.setRequestHeader('Content-Type','application/json');
+    setTorrAuthorization(x);
+    x.onload = function() {
+      if (x.status !== 200) {
+        mzPlaybackSamples.push({time:new Date().toLocaleTimeString(),http:x.status});
+      } else {
+        try {
+          var st = JSON.parse(x.responseText || '{}');
+          var keys = ['download_speed','active_peers','connected_seeders','total_peers','preloaded_bytes','preload_size','bit_rate','stat_string','stat','downloaded','loaded_size','torrent_size','total_size'];
+          var entry = {time:new Date().toLocaleTimeString()};
+          keys.forEach(function(k){if(st[k] !== undefined && st[k] !== null) entry[k] = st[k];});
+          mzPlaybackSamples.push(entry);
+        } catch(e) {mzPlaybackSamples.push({time:new Date().toLocaleTimeString(),error:'JSON'});}
+      }
+      if (mzPlaybackSamples.length > 60) mzPlaybackSamples.shift();
+      try {localStorage.setItem('mz_playback_samples',JSON.stringify(mzPlaybackSamples));} catch(e) {}
+    };
+    x.onerror = function(){mzPlaybackSamples.push({time:new Date().toLocaleTimeString(),error:'network'});};
+    x.send(JSON.stringify({action:'get',hash:hash}));
+  }
+  sample();
+  mzPlaybackMonitor = setInterval(sample,5000);
+}
+function showPlaybackJournal() {
+  var samples = [];
+  try {samples = JSON.parse(localStorage.getItem('mz_playback_samples') || '[]');} catch(e) {}
+  if (!samples.length) {notice('TorrServer: журнал порожній. Запусти відео');return;}
+  var speeds = samples.filter(function(s){return typeof s.download_speed === 'number';}).map(function(s){return s.download_speed / 1048576;});
+  var items = [
+    {title:'Зразків: '+samples.length+' (кожні 5 секунд)'},
+    {title:'Мінімальна швидкість: '+(speeds.length ? Math.min.apply(null,speeds).toFixed(2) : 'немає даних')+' МБ/с'},
+    {title:'Середня швидкість: '+(speeds.length ? (speeds.reduce(function(a,b){return a+b;},0)/speeds.length).toFixed(2) : 'немає даних')+' МБ/с'},
+    {title:'Максимальна швидкість: '+(speeds.length ? Math.max.apply(null,speeds).toFixed(2) : 'немає даних')+' МБ/с'}
+  ];
+  samples.slice(-30).forEach(function(s) {
+    var speed = typeof s.download_speed === 'number' ? (s.download_speed / 1048576).toFixed(2)+' МБ/с' : 'немає швидкості';
+    var peers = s.active_peers === undefined ? '?' : s.active_peers;
+    var state = s.stat_string || s.error || (s.http ? 'HTTP '+s.http : '');
+    items.push({title:s.time+' | '+speed+' | піри '+peers,subtitle:state});
+  });
+  Lampa.Select.show({
+    title:'Журнал відтворення TorrServer',
+    items:items,
+    onSelect:function(){},
+    onBack:function(){openMenu();}
+  });
+}
 function requestMazepaTorrent(item) {
   var token = localStorage.getItem('mz_device_token');
   if (!token) { notice('Mazepa: потрібно прив’язати телевізор'); return; }
@@ -319,6 +383,7 @@ function requestMazepaTorrent(item) {
           var play = function(file) {
             try {
               var url = 'http://192.168.0.110:8090/play/' + encodeURIComponent(status.hash) + '/' + encodeURIComponent(file.id);
+              startPlaybackMonitor(status.hash);
               Lampa.Player.play({url:url,title:file.path || item.title});
             } catch(e) {notice('Mazepa: помилка відкриття плеєра');}
           };
@@ -501,8 +566,8 @@ function openMenu() {
   mzLog('SCREEN','main menu opened');
   Lampa.Select.show({
     title: 'Mazepa',
-    items: [{title:'Пошук торрентів Mazepa', id:'search'},{title:'Повторити останній пошук', id:'search_again'},{title:'Відкритий каталог Mazepa (тест)', id:'catalog'},{title:'Перевірити сесію Mazepa.to', id:'session'},{title:'Діагностика cookies', id:'cookie'},{title:'Тест власної сесії', id:'own'},{title:'Перевірити Cloudflare Worker', id:'worker'},{title:'Перевірити TorrServer', id:'ts_diag'},{title:'Швидкість і буфер відео', id:'ts_speed'},{title:'Зберегти авторизацію TorrServer', id:'ts_auth'},{title:'Очистити авторизацію TorrServer', id:'ts_clear'},{title:'Створити код прив’язки', id:'pair'},{title:'Показати код прив’язки', id:'show_pair'},{title:'Перевірити прив’язку', id:'pair_status'},{title:'Увімкнути діагностику', id:'trace_on'},{title:'Показати журнал', id:'trace_show'},{title:'Вимкнути діагностику', id:'trace_off'}],
-    onSelect: function(item) { mzLog('SELECT', item && item.id ? item.id : 'unknown'); if (item && item.id === 'trace_on') mzEnableTrace(); else if (item && item.id === 'trace_show') mzShowTrace(); else if (item && item.id === 'trace_off') mzDisableTrace(); else if (item && item.id === 'search') searchMazepaPrompt(); else if (item && item.id === 'search_again') searchMazepa(localStorage.getItem('mz_last_query')); else if (item && item.id === 'catalog') publicTrackerPreview(); else if (item && item.id === 'session') sessionCheck(); else if (item && item.id === 'cookie') cookieDiagnostics(); else if (item && item.id === 'own') ownSessionProbe(); else if (item && item.id === 'worker') workerProbe(); else if (item && item.id === 'ts_diag') torrServerDiagnostic(); else if (item && item.id === 'ts_speed') checkPlaybackSpeed(); else if (item && item.id === 'ts_auth') configureTorrserverAuth(); else if (item && item.id === 'ts_clear') clearTorrserverAuth(); else if (item && item.id === 'pair') pairDevice(); else if (item && item.id === 'show_pair') showSavedPairCode(); else if (item && item.id === 'pair_status') pairStatus(); }
+    items: [{title:'Пошук торрентів Mazepa', id:'search'},{title:'Повторити останній пошук', id:'search_again'},{title:'Відкритий каталог Mazepa (тест)', id:'catalog'},{title:'Перевірити сесію Mazepa.to', id:'session'},{title:'Діагностика cookies', id:'cookie'},{title:'Тест власної сесії', id:'own'},{title:'Перевірити Cloudflare Worker', id:'worker'},{title:'Перевірити TorrServer', id:'ts_diag'},{title:'Швидкість і буфер відео', id:'ts_speed'},{title:'Журнал зависань відео', id:'ts_journal'},{title:'Зберегти авторизацію TorrServer', id:'ts_auth'},{title:'Очистити авторизацію TorrServer', id:'ts_clear'},{title:'Створити код прив’язки', id:'pair'},{title:'Показати код прив’язки', id:'show_pair'},{title:'Перевірити прив’язку', id:'pair_status'},{title:'Увімкнути діагностику', id:'trace_on'},{title:'Показати журнал', id:'trace_show'},{title:'Вимкнути діагностику', id:'trace_off'}],
+    onSelect: function(item) { mzLog('SELECT', item && item.id ? item.id : 'unknown'); if (item && item.id === 'trace_on') mzEnableTrace(); else if (item && item.id === 'trace_show') mzShowTrace(); else if (item && item.id === 'trace_off') mzDisableTrace(); else if (item && item.id === 'search') searchMazepaPrompt(); else if (item && item.id === 'search_again') searchMazepa(localStorage.getItem('mz_last_query')); else if (item && item.id === 'catalog') publicTrackerPreview(); else if (item && item.id === 'session') sessionCheck(); else if (item && item.id === 'cookie') cookieDiagnostics(); else if (item && item.id === 'own') ownSessionProbe(); else if (item && item.id === 'worker') workerProbe(); else if (item && item.id === 'ts_diag') torrServerDiagnostic(); else if (item && item.id === 'ts_speed') checkPlaybackSpeed(); else if (item && item.id === 'ts_journal') showPlaybackJournal(); else if (item && item.id === 'ts_auth') configureTorrserverAuth(); else if (item && item.id === 'ts_clear') clearTorrserverAuth(); else if (item && item.id === 'pair') pairDevice(); else if (item && item.id === 'show_pair') showSavedPairCode(); else if (item && item.id === 'pair_status') pairStatus(); }
   });
 }
 function init() {
