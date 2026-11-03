@@ -91,6 +91,7 @@ function pairDevice() {
       if (!data.code || !data.device_secret) throw new Error('Bad response');
       localStorage.setItem('mz_device_secret', data.device_secret);
       localStorage.setItem('mz_pair_code', data.code);
+      localStorage.setItem('mz_pair_expires', String(Date.now() + 300000));
       var existing = document.getElementById('mz-pair-overlay');
       if (existing) existing.remove();
       var overlay = document.createElement('div');
@@ -122,6 +123,20 @@ function pairDevice() {
   x.ontimeout = function(){notice('Mazepa: Worker не відповідає');};
   x.send('{}');
 }
+function showSavedPairCode() {
+  var code = localStorage.getItem('mz_pair_code');
+  var expires = Number(localStorage.getItem('mz_pair_expires') || 0);
+  if (!code || Date.now() > expires) {
+    notice('Код відсутній або вже недійсний. Створи новий.');
+    return;
+  }
+  Lampa.Select.show({
+    title: 'Код прив’язки: ' + code,
+    items: [{title:'КОД: ' + code, subtitle:'Дійсний до 5 хвилин від створення', id:'code'}],
+    onSelect: function(){showSavedPairCode();},
+    onBack: function(){}
+  });
+}
 function pairStatus() {
   var secret = localStorage.getItem('mz_device_secret');
   if (!secret) { notice('Спочатку створи код прив’язки'); return; }
@@ -145,8 +160,8 @@ function pairStatus() {
 function openMenu() {
   Lampa.Select.show({
     title: 'Mazepa',
-    items: [{title:'Перевірити сесію Mazepa.to', id:'session'},{title:'Діагностика cookies', id:'cookie'},{title:'Тест власної сесії', id:'own'},{title:'Перевірити Cloudflare Worker', id:'worker'},{title:'Створити код прив’язки', id:'pair'},{title:'Перевірити прив’язку', id:'pair_status'}],
-    onSelect: function(item) { if (item && item.id === 'session') sessionCheck(); else if (item && item.id === 'cookie') cookieDiagnostics(); else if (item && item.id === 'own') ownSessionProbe(); else if (item && item.id === 'worker') workerProbe(); else if (item && item.id === 'pair') pairDevice(); else if (item && item.id === 'pair_status') pairStatus(); },
+    items: [{title:'Перевірити сесію Mazepa.to', id:'session'},{title:'Діагностика cookies', id:'cookie'},{title:'Тест власної сесії', id:'own'},{title:'Перевірити Cloudflare Worker', id:'worker'},{title:'Створити код прив’язки', id:'pair'},{title:'Показати код прив’язки', id:'show_pair'},{title:'Перевірити прив’язку', id:'pair_status'}],
+    onSelect: function(item) { if (item && item.id === 'session') sessionCheck(); else if (item && item.id === 'cookie') cookieDiagnostics(); else if (item && item.id === 'own') ownSessionProbe(); else if (item && item.id === 'worker') workerProbe(); else if (item && item.id === 'pair') pairDevice(); else if (item && item.id === 'show_pair') showSavedPairCode(); else if (item && item.id === 'pair_status') pairStatus(); },
     onBack: function() {}
   });
 }
