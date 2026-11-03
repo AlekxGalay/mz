@@ -384,7 +384,31 @@ function requestMazepaTorrent(item) {
             try {
               var url = 'http://192.168.0.110:8090/play/' + encodeURIComponent(status.hash) + '/' + encodeURIComponent(file.id);
               startPlaybackMonitor(status.hash);
-              Lampa.Player.play({url:url,title:file.path || item.title});
+              notice('TorrServer: попередньо завантажуємо буфер...');
+              var preload = new XMLHttpRequest();
+              var bufferUrl = 'http://192.168.0.110:8090/stream/video?link=' +
+                encodeURIComponent(status.hash) + '&index=' + encodeURIComponent(file.id) + '&preload&stat';
+              preload.open('GET',bufferUrl,true);
+              preload.timeout = 120000;
+              setTorrAuthorization(preload);
+              preload.onload = function() {
+                if (preload.status !== 200) {
+                  notice('TorrServer: буфер HTTP ' + preload.status);
+                  return;
+                }
+                try {
+                  var stat = JSON.parse(preload.responseText || '{}');
+                  var bytes = Number(stat.preloaded_bytes || 0) / 1048576;
+                  notice('TorrServer: буфер готовий (' + bytes.toFixed(1) + ' МБ)');
+                } catch(e) {
+                  notice('TorrServer: підготовку потоку завершено');
+                }
+                startPlaybackMonitor(status.hash);
+                Lampa.Player.play({url:url,title:file.path || item.title});
+              };
+              preload.onerror = function(){notice('TorrServer: не вдалося підготувати буфер');};
+              preload.ontimeout = function(){notice('TorrServer: буфер не готовий за 120 секунд');};
+              preload.send();
             } catch(e) {notice('Mazepa: помилка відкриття плеєра');}
           };
           if (files.length === 1) play(files[0]);
