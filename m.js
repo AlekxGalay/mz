@@ -187,7 +187,8 @@ function publicTrackerPreview() {
     if (x.status !== 200) { notice('Mazepa: HTTP ' + x.status); return; }
     try {
       var doc = new DOMParser().parseFromString(x.responseText || '', 'text/html');
-      var links = doc.querySelectorAll('a[href*="viewtopic.php"], a[href*="topic-"]');
+      if (/login\\.php/i.test(x.responseURL || '') || doc.querySelector('input[name="login_password"]')) { notice('Mazepa: потрібна авторизація на трекері'); return; }
+      var links = doc.querySelectorAll('a[href*="topic-"], a[href*="viewtopic.php"]');
       var items = [];
       var seen = {};
       for (var i = 0; i < links.length && items.length < 30; i++) {
@@ -197,7 +198,7 @@ function publicTrackerPreview() {
         seen[title] = true;
         items.push({title:title, id:'release_' + items.length});
       }
-      if (!items.length) { notice('Mazepa: релізи не знайдені у відповіді'); return; }
+      if (!items.length) { notice('Mazepa: не знайдено посилань на релізи (HTTP ' + x.status + ')'); return; }
       Lampa.Select.show({
         title:'Mazepa — відкритий каталог (' + items.length + ')',
         items:items,
