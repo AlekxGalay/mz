@@ -26,11 +26,27 @@ function sessionCheck() {
   request.ontimeout = function () { notice('Mazepa: таймаут'); };
   request.send();
 }
+function cookieDiagnostics() {
+  notice('Mazepa: перевіряємо доступ до cookies...');
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', HOME + 'tracker.php?mzcheck=' + Date.now(), true);
+  xhr.withCredentials = true;
+  xhr.timeout = 12000;
+  xhr.onload = function () {
+    var body = xhr.responseText || '';
+    var login = /login_username|login_password|name=["']login["']/i.test(body) || /login\\.php/i.test(xhr.responseURL || '');
+    var msg = 'Mazepa cookie: HTTP ' + xhr.status + ', ' + (login ? 'сесія не передалася' : 'сторінка не схожа на форму входу');
+    notice(msg);
+  };
+  xhr.onerror = function(){notice('Mazepa cookie: запит заблокований (мережа/CORS)');};
+  xhr.ontimeout = function(){notice('Mazepa cookie: таймаут');};
+  xhr.send();
+}
 function openMenu() {
   Lampa.Select.show({
     title: 'Mazepa',
-    items: [{title:'Перевірити сесію Mazepa.to', id:'session'}],
-    onSelect: function(item) { if (item && item.id === 'session') sessionCheck(); },
+    items: [{title:'Перевірити сесію Mazepa.to', id:'session'},{title:'Діагностика cookies', id:'cookie'}],
+    onSelect: function(item) { if (item && item.id === 'session') sessionCheck(); else if (item && item.id === 'cookie') cookieDiagnostics(); },
     onBack: function() {}
   });
 }
