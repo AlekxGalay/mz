@@ -259,7 +259,12 @@ function requestMazepaTorrent(item) {
     up.open('POST', 'http://192.168.0.110:8090/torrent/upload', true);
     up.timeout = 60000;
     up.onload = function() {
-      if (up.status !== 200) {notice('TorrServer: HTTP ' + up.status);return;}
+      if (up.status !== 200) {
+        var challenge = up.getResponseHeader('WWW-Authenticate') || '';
+        var message = (up.responseText || '').replace(/<[^>]*>/g,' ').replace(/\\s+/g,' ').slice(0,120);
+        notice('TorrServer: HTTP ' + up.status + (challenge ? ' — потрібен логін' : '') + (message ? ' — ' + message : ''));
+        return;
+      }
       try {
         var data = JSON.parse(up.responseText || '{}');
         var torrent = Array.isArray(data) ? data[0] : data;
