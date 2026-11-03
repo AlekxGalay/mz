@@ -252,7 +252,30 @@ function requestMazepaTorrent(item) {
     up.open('POST', 'http://192.168.0.110:8090/torrent/upload', true);
     up.timeout = 60000;
     up.onload = function() {
-      notice('TorrServer: відповідь HTTP ' + up.status);
+      if (up.status !== 200) {notice('TorrServer: HTTP ' + up.status);return;}
+      try {
+        var data = JSON.parse(up.responseText || '{}');
+        var torrent = Array.isArray(data) ? data[0] : data;
+        if (!torrent || !torrent.hash) throw new Error('No infohash');
+        var files = (torrent.file_stats || []).filter(function(f){
+          return /\\.(mkv|mp4|avi|m4v|mov|ts|webm)$/i.test(f.path || '');
+        });
+        if (!files.length) {
+          notice('TorrServer: торрент додано, очікуємо метадані');
+          return;
+        }
+        var choose = function(file) {
+          var url = 'http://192.168.0.110:8090/play/' + encodeURIComponent(torrent.hash) + '/' + encodeURIComponent(file.id);
+          Lampa.Player.play({url:url, title:file.path || item.title});
+        };
+        if (files.length === 1) choose(files[0]);
+        else Lampa.Select.show({
+          title:'Вибір відеофайлу',
+          items:files.map(function(f,i){return {title:f.path, id:String(i)};}),
+          onSelect:function(selected){if(selected)choose(files[Number(selected.id)]);},
+          onBack:function(){openMenu();}
+        });
+      } catch(e) {notice('TorrServer: не вдалося обробити torrent');}
     };
     up.onerror = function(){notice('TorrServer: мережа або CORS');};
     up.ontimeout = function(){notice('TorrServer: таймаут');};
