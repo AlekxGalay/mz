@@ -198,7 +198,25 @@ function publicTrackerPreview() {
         seen[title] = true;
         items.push({title:title, id:'release_' + items.length});
       }
-      if (!items.length) { notice('Mazepa: не знайдено посилань на релізи (HTTP ' + x.status + ')'); return; }
+      if (!items.length) {
+        var pageTitle = (doc.title || '').slice(0, 90);
+        var body = (doc.body && doc.body.textContent || '').replace(/\\s+/g,' ').trim();
+        var pageType = /увійти|пароль|авторизац/i.test(body.slice(0,900)) ? 'можлива сторінка входу' : /cloudflare|checking your browser|access denied/i.test(body.slice(0,900)) ? 'захист сайту' : 'невідомий вміст';
+        Lampa.Select.show({
+          title:'Mazepa — діагностика каталогу',
+          items:[
+            {title:'HTTP: ' + x.status},
+            {title:'Розмір відповіді: ' + (x.responseText || '').length + ' символів'},
+            {title:'HTML-посилань: ' + doc.querySelectorAll('a[href]').length},
+            {title:'Посилань на релізи: ' + links.length},
+            {title:'Сторінка: ' + (pageTitle || 'без назви')},
+            {title:'Тип відповіді: ' + pageType}
+          ],
+          onSelect:function(){},
+          onBack:function(){openMenu();}
+        });
+        return;
+      }
       Lampa.Select.show({
         title:'Mazepa — відкритий каталог (' + items.length + ')',
         items:items,
