@@ -92,31 +92,7 @@ function pairDevice() {
       localStorage.setItem('mz_device_secret', data.device_secret);
       localStorage.setItem('mz_pair_code', data.code);
       localStorage.setItem('mz_pair_expires', String(Date.now() + 300000));
-      var existing = document.getElementById('mz-pair-overlay');
-      if (existing) existing.remove();
-      var overlay = document.createElement('div');
-      overlay.id = 'mz-pair-overlay';
-      overlay.style.cssText = 'position:fixed;inset:0;z-index:999999;background:#12151b;color:#fff;display:flex;align-items:center;justify-content:center;';
-      var panel = document.createElement('div');
-      panel.style.cssText = 'text-align:center;padding:40px;max-width:90vw;';
-      var heading = document.createElement('h2');
-      heading.textContent = 'Прив’язка Mazepa';
-      var code = document.createElement('div');
-      code.textContent = data.code;
-      code.style.cssText = 'font-size:72px;font-weight:bold;letter-spacing:12px;margin:30px 0;';
-      var help = document.createElement('p');
-      help.textContent = 'Код дійсний 5 хвилин. Запиши його та підтвердь на комп’ютері.';
-      var close = document.createElement('button');
-      close.textContent = 'Закрити';
-      close.style.cssText = 'font-size:24px;padding:14px 35px;margin-top:25px;color:#111;background:#fff;border-radius:8px;';
-      close.onclick = function(){overlay.remove();};
-      panel.appendChild(heading);
-      panel.appendChild(code);
-      panel.appendChild(help);
-      panel.appendChild(close);
-      overlay.appendChild(panel);
-      document.body.appendChild(overlay);
-      close.focus();
+      showSavedPairCode();
     } catch(e) { notice('Mazepa: помилка створення коду (HTTP ' + x.status + ')'); }
   };
   x.onerror = function(){notice('Mazepa: Worker недоступний');};
@@ -132,8 +108,8 @@ function showSavedPairCode() {
   }
   Lampa.Select.show({
     title: 'Код прив’язки: ' + code,
-    items: [{title:'КОД: ' + code, subtitle:'Дійсний до 5 хвилин від створення', id:'code'}],
-    onSelect: function(){showSavedPairCode();},
+    items: [{title:'КОД: ' + code, subtitle:'Запиши код. Дійсний 5 хвилин', id:'code'},{title:'Перевірити прив’язку', id:'check'}],
+    onSelect: function(item){if(item && item.id === 'check') pairStatus(); else showSavedPairCode();},
     onBack: function(){}
   });
 }
