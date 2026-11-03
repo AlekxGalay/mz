@@ -1,0 +1,2 @@
+# mz
+lampa-mazepa-release
