@@ -351,12 +351,42 @@ function searchMazepaPrompt() {
     else openMenu();
   });
 }
+function torrServerDiagnostic() {
+  var base = 'http://192.168.0.110:8090';
+  var checks = [
+    {label:'HTTP /echo', method:'GET', path:'/echo'},
+    {label:'HTTP /torrent/list', method:'POST', path:'/torrent/list', body:'{}'}
+  ];
+  var output = [];
+  function next(i) {
+    if (i >= checks.length) {
+      Lampa.Select.show({
+        title:'TorrServer — перевірка доступу',
+        items:output.map(function(t,j){return {title:t,id:String(j)};}),
+        onSelect:function(){},
+        onBack:function(){openMenu();}
+      });
+      return;
+    }
+    var check = checks[i];
+    var x = new XMLHttpRequest();
+    x.open(check.method,base+check.path,true);
+    x.timeout = 8000;
+    if (check.body) x.setRequestHeader('Content-Type','application/json');
+    x.onload=function(){output.push(check.label + ': HTTP ' + x.status);next(i+1);};
+    x.onerror=function(){output.push(check.label + ': мережева помилка / CORS');next(i+1);};
+    x.ontimeout=function(){output.push(check.label + ': таймаут');next(i+1);};
+    x.send(check.body || null);
+  }
+  notice('TorrServer: перевіряємо доступ...');
+  next(0);
+}
 function openMenu() {
   mzLog('SCREEN','main menu opened');
   Lampa.Select.show({
     title: 'Mazepa',
-    items: [{title:'Пошук торрентів Mazepa', id:'search'},{title:'Повторити останній пошук', id:'search_again'},{title:'Відкритий каталог Mazepa (тест)', id:'catalog'},{title:'Перевірити сесію Mazepa.to', id:'session'},{title:'Діагностика cookies', id:'cookie'},{title:'Тест власної сесії', id:'own'},{title:'Перевірити Cloudflare Worker', id:'worker'},{title:'Створити код прив’язки', id:'pair'},{title:'Показати код прив’язки', id:'show_pair'},{title:'Перевірити прив’язку', id:'pair_status'},{title:'Увімкнути діагностику', id:'trace_on'},{title:'Показати журнал', id:'trace_show'},{title:'Вимкнути діагностику', id:'trace_off'}],
-    onSelect: function(item) { mzLog('SELECT', item && item.id ? item.id : 'unknown'); if (item && item.id === 'trace_on') mzEnableTrace(); else if (item && item.id === 'trace_show') mzShowTrace(); else if (item && item.id === 'trace_off') mzDisableTrace(); else if (item && item.id === 'search') searchMazepaPrompt(); else if (item && item.id === 'search_again') searchMazepa(localStorage.getItem('mz_last_query')); else if (item && item.id === 'catalog') publicTrackerPreview(); else if (item && item.id === 'session') sessionCheck(); else if (item && item.id === 'cookie') cookieDiagnostics(); else if (item && item.id === 'own') ownSessionProbe(); else if (item && item.id === 'worker') workerProbe(); else if (item && item.id === 'pair') pairDevice(); else if (item && item.id === 'show_pair') showSavedPairCode(); else if (item && item.id === 'pair_status') pairStatus(); }
+    items: [{title:'Пошук торрентів Mazepa', id:'search'},{title:'Повторити останній пошук', id:'search_again'},{title:'Відкритий каталог Mazepa (тест)', id:'catalog'},{title:'Перевірити сесію Mazepa.to', id:'session'},{title:'Діагностика cookies', id:'cookie'},{title:'Тест власної сесії', id:'own'},{title:'Перевірити Cloudflare Worker', id:'worker'},{title:'Перевірити TorrServer', id:'ts_diag'},{title:'Створити код прив’язки', id:'pair'},{title:'Показати код прив’язки', id:'show_pair'},{title:'Перевірити прив’язку', id:'pair_status'},{title:'Увімкнути діагностику', id:'trace_on'},{title:'Показати журнал', id:'trace_show'},{title:'Вимкнути діагностику', id:'trace_off'}],
+    onSelect: function(item) { mzLog('SELECT', item && item.id ? item.id : 'unknown'); if (item && item.id === 'trace_on') mzEnableTrace(); else if (item && item.id === 'trace_show') mzShowTrace(); else if (item && item.id === 'trace_off') mzDisableTrace(); else if (item && item.id === 'search') searchMazepaPrompt(); else if (item && item.id === 'search_again') searchMazepa(localStorage.getItem('mz_last_query')); else if (item && item.id === 'catalog') publicTrackerPreview(); else if (item && item.id === 'session') sessionCheck(); else if (item && item.id === 'cookie') cookieDiagnostics(); else if (item && item.id === 'own') ownSessionProbe(); else if (item && item.id === 'worker') workerProbe(); else if (item && item.id === 'ts_diag') torrServerDiagnostic(); else if (item && item.id === 'pair') pairDevice(); else if (item && item.id === 'show_pair') showSavedPairCode(); else if (item && item.id === 'pair_status') pairStatus(); }
   });
 }
 function init() {
