@@ -298,7 +298,7 @@ function requestMazepaTorrent(item) {
         if (!torrent || !torrent.hash) throw new Error('No infohash');
         function showReadyFiles(status) {
           var files = (status.file_stats || []).filter(function(f) {
-            return /\\.(mkv|mp4|avi|m4v|mov|ts|webm)$/i.test(f.path || '');
+            return /[.](mkv|mp4|avi|m4v|mov|ts|webm)$/i.test(f.path || '');
           });
           if (!files.length) return false;
           var play = function(file) {
