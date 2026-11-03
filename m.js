@@ -178,12 +178,44 @@ function pairStatus() {
   x.onerror = function(){notice('Mazepa: Worker недоступний');};
   x.send(JSON.stringify({device_secret:secret}));
 }
+function publicTrackerPreview() {
+  notice('Mazepa: завантажуємо відкритий каталог...');
+  var x = new XMLHttpRequest();
+  x.open('GET', HOME + 'tracker.php?pid=-1', true);
+  x.timeout = 15000;
+  x.onload = function() {
+    if (x.status !== 200) { notice('Mazepa: HTTP ' + x.status); return; }
+    try {
+      var doc = new DOMParser().parseFromString(x.responseText || '', 'text/html');
+      var links = doc.querySelectorAll('a[href*="viewtopic.php"], a[href*="topic-"]');
+      var items = [];
+      var seen = {};
+      for (var i = 0; i < links.length && items.length < 30; i++) {
+        var el = links[i];
+        var title = (el.textContent || '').replace(/\\s+/g,' ').trim();
+        if (title.length < 8 || seen[title]) continue;
+        seen[title] = true;
+        items.push({title:title, id:'release_' + items.length});
+      }
+      if (!items.length) { notice('Mazepa: релізи не знайдені у відповіді'); return; }
+      Lampa.Select.show({
+        title:'Mazepa — відкритий каталог (' + items.length + ')',
+        items:items,
+        onSelect:function(item){notice(item.title);},
+        onBack:function(){openMenu();}
+      });
+    } catch(e) { notice('Mazepa: помилка обробки каталогу'); }
+  };
+  x.onerror = function(){notice('Mazepa: каталог заблокований мережею/CORS');};
+  x.ontimeout = function(){notice('Mazepa: таймаут каталогу');};
+  x.send();
+}
 function openMenu() {
   mzLog('SCREEN','main menu opened');
   Lampa.Select.show({
     title: 'Mazepa',
-    items: [{title:'Перевірити сесію Mazepa.to', id:'session'},{title:'Діагностика cookies', id:'cookie'},{title:'Тест власної сесії', id:'own'},{title:'Перевірити Cloudflare Worker', id:'worker'},{title:'Створити код прив’язки', id:'pair'},{title:'Показати код прив’язки', id:'show_pair'},{title:'Перевірити прив’язку', id:'pair_status'},{title:'Увімкнути діагностику', id:'trace_on'},{title:'Показати журнал', id:'trace_show'},{title:'Вимкнути діагностику', id:'trace_off'}],
-    onSelect: function(item) { mzLog('SELECT', item && item.id ? item.id : 'unknown'); if (item && item.id === 'trace_on') mzEnableTrace(); else if (item && item.id === 'trace_show') mzShowTrace(); else if (item && item.id === 'trace_off') mzDisableTrace(); else if (item && item.id === 'session') sessionCheck(); else if (item && item.id === 'cookie') cookieDiagnostics(); else if (item && item.id === 'own') ownSessionProbe(); else if (item && item.id === 'worker') workerProbe(); else if (item && item.id === 'pair') pairDevice(); else if (item && item.id === 'show_pair') showSavedPairCode(); else if (item && item.id === 'pair_status') pairStatus(); }
+    items: [{title:'Відкритий каталог Mazepa (тест)', id:'catalog'},{title:'Перевірити сесію Mazepa.to', id:'session'},{title:'Діагностика cookies', id:'cookie'},{title:'Тест власної сесії', id:'own'},{title:'Перевірити Cloudflare Worker', id:'worker'},{title:'Створити код прив’язки', id:'pair'},{title:'Показати код прив’язки', id:'show_pair'},{title:'Перевірити прив’язку', id:'pair_status'},{title:'Увімкнути діагностику', id:'trace_on'},{title:'Показати журнал', id:'trace_show'},{title:'Вимкнути діагностику', id:'trace_off'}],
+    onSelect: function(item) { mzLog('SELECT', item && item.id ? item.id : 'unknown'); if (item && item.id === 'trace_on') mzEnableTrace(); else if (item && item.id === 'trace_show') mzShowTrace(); else if (item && item.id === 'trace_off') mzDisableTrace(); else if (item && item.id === 'catalog') publicTrackerPreview(); else if (item && item.id === 'session') sessionCheck(); else if (item && item.id === 'cookie') cookieDiagnostics(); else if (item && item.id === 'own') ownSessionProbe(); else if (item && item.id === 'worker') workerProbe(); else if (item && item.id === 'pair') pairDevice(); else if (item && item.id === 'show_pair') showSavedPairCode(); else if (item && item.id === 'pair_status') pairStatus(); }
   });
 }
 function init() {
