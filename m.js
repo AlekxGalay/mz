@@ -64,11 +64,26 @@ function ownSessionProbe() {
     });
   });
 }
+function workerProbe() {
+  notice('Mazepa: перевіряємо Cloudflare Worker...');
+  var x = new XMLHttpRequest();
+  x.open('GET', 'https://mz-api.galajalexej.workers.dev/test', true);
+  x.timeout = 12000;
+  x.onload = function() {
+    try {
+      var data = JSON.parse(x.responseText || '{}');
+      notice('Worker: HTTP ' + x.status + ', Mazepa: HTTP ' + data.mazepa_http);
+    } catch(e) { notice('Worker: некоректна відповідь'); }
+  };
+  x.onerror = function(){notice('Worker: помилка мережі або CORS');};
+  x.ontimeout = function(){notice('Worker: таймаут');};
+  x.send();
+}
 function openMenu() {
   Lampa.Select.show({
     title: 'Mazepa',
-    items: [{title:'Перевірити сесію Mazepa.to', id:'session'},{title:'Діагностика cookies', id:'cookie'},{title:'Тест власної сесії', id:'own'}],
-    onSelect: function(item) { if (item && item.id === 'session') sessionCheck(); else if (item && item.id === 'cookie') cookieDiagnostics(); else if (item && item.id === 'own') ownSessionProbe(); },
+    items: [{title:'Перевірити сесію Mazepa.to', id:'session'},{title:'Діагностика cookies', id:'cookie'},{title:'Тест власної сесії', id:'own'},{title:'Перевірити Cloudflare Worker', id:'worker'}],
+    onSelect: function(item) { if (item && item.id === 'session') sessionCheck(); else if (item && item.id === 'cookie') cookieDiagnostics(); else if (item && item.id === 'own') ownSessionProbe(); else if (item && item.id === 'worker') workerProbe(); },
     onBack: function() {}
   });
 }
