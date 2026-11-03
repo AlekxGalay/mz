@@ -310,6 +310,7 @@ function requestMazepaTorrent(item) {
         var data = JSON.parse(up.responseText || '{}');
         var torrent = Array.isArray(data) ? data[0] : data;
         if (!torrent || !torrent.hash) throw new Error('No infohash');
+        try {localStorage.setItem('mz_last_torrent_hash',torrent.hash);} catch(e) {}
         function showReadyFiles(status) {
           var files = (status.file_stats || []).filter(function(f) {
             return /[.](mkv|mp4|avi|m4v|mov|ts|webm)$/i.test(f.path || '');
@@ -429,6 +430,43 @@ function searchMazepaPrompt() {
     else openMenu();
   });
 }
+function checkPlaybackSpeed() {
+  var hash = '';
+  try {hash = localStorage.getItem('mz_last_torrent_hash') || '';} catch(e) {}
+  if (!hash) {notice('TorrServer: спочатку вибери реліз');return;}
+  var x = new XMLHttpRequest();
+  x.open('POST','http://192.168.0.110:8090/torrents',true);
+  x.timeout = 12000;
+  x.setRequestHeader('Content-Type','application/json');
+  setTorrAuthorization(x);
+  x.onload = function() {
+    if (x.status !== 200) {notice('TorrServer: статус HTTP ' + x.status);return;}
+    try {
+      var st = JSON.parse(x.responseText || '{}');
+      var speed = Number(st.download_speed || 0) / 1048576;
+      var bitrate = st.bit_rate || 'невідомий';
+      var items = [
+        {title:'Швидкість завантаження: ' + speed.toFixed(2) + ' МБ/с'},
+        {title:'Активних пірів: ' + Number(st.active_peers || 0)},
+        {title:'Сідерів підключено: ' + Number(st.connected_seeders || 0)},
+        {title:'Усього пірів: ' + Number(st.total_peers || 0)},
+        {title:'Буфер: ' + (Number(st.preloaded_bytes || 0)/1048576).toFixed(1) + ' / ' + (Number(st.preload_size || 0)/1048576).toFixed(1) + ' МБ'},
+        {title:'Бітрейт: ' + bitrate},
+        {title:'Стан: ' + (st.stat_string || 'невідомо')},
+        {title:'Оновити показники',id:'refresh'}
+      ];
+      Lampa.Select.show({
+        title:'TorrServer — стан відтворення',
+        items:items,
+        onSelect:function(item){if(item && item.id === 'refresh')checkPlaybackSpeed();},
+        onBack:function(){openMenu();}
+      });
+    } catch(e) {notice('TorrServer: не вдалося прочитати статистику');}
+  };
+  x.onerror = function(){notice('TorrServer: статус недоступний');};
+  x.ontimeout = function(){notice('TorrServer: статус — таймаут');};
+  x.send(JSON.stringify({action:'get',hash:hash}));
+}
 function torrServerDiagnostic() {
   var base = 'http://192.168.0.110:8090';
   var checks = [
@@ -464,8 +502,8 @@ function openMenu() {
   mzLog('SCREEN','main menu opened');
   Lampa.Select.show({
     title: 'Mazepa',
-    items: [{title:'Пошук торрентів Mazepa', id:'search'},{title:'Повторити останній пошук', id:'search_again'},{title:'Відкритий каталог Mazepa (тест)', id:'catalog'},{title:'Перевірити сесію Mazepa.to', id:'session'},{title:'Діагностика cookies', id:'cookie'},{title:'Тест власної сесії', id:'own'},{title:'Перевірити Cloudflare Worker', id:'worker'},{title:'Перевірити TorrServer', id:'ts_diag'},{title:'Зберегти авторизацію TorrServer', id:'ts_auth'},{title:'Очистити авторизацію TorrServer', id:'ts_clear'},{title:'Створити код прив’язки', id:'pair'},{title:'Показати код прив’язки', id:'show_pair'},{title:'Перевірити прив’язку', id:'pair_status'},{title:'Увімкнути діагностику', id:'trace_on'},{title:'Показати журнал', id:'trace_show'},{title:'Вимкнути діагностику', id:'trace_off'}],
-    onSelect: function(item) { mzLog('SELECT', item && item.id ? item.id : 'unknown'); if (item && item.id === 'trace_on') mzEnableTrace(); else if (item && item.id === 'trace_show') mzShowTrace(); else if (item && item.id === 'trace_off') mzDisableTrace(); else if (item && item.id === 'search') searchMazepaPrompt(); else if (item && item.id === 'search_again') searchMazepa(localStorage.getItem('mz_last_query')); else if (item && item.id === 'catalog') publicTrackerPreview(); else if (item && item.id === 'session') sessionCheck(); else if (item && item.id === 'cookie') cookieDiagnostics(); else if (item && item.id === 'own') ownSessionProbe(); else if (item && item.id === 'worker') workerProbe(); else if (item && item.id === 'ts_diag') torrServerDiagnostic(); else if (item && item.id === 'ts_auth') configureTorrserverAuth(); else if (item && item.id === 'ts_clear') clearTorrserverAuth(); else if (item && item.id === 'pair') pairDevice(); else if (item && item.id === 'show_pair') showSavedPairCode(); else if (item && item.id === 'pair_status') pairStatus(); }
+    items: [{title:'Пошук торрентів Mazepa', id:'search'},{title:'Повторити останній пошук', id:'search_again'},{title:'Відкритий каталог Mazepa (тест)', id:'catalog'},{title:'Перевірити сесію Mazepa.to', id:'session'},{title:'Діагностика cookies', id:'cookie'},{title:'Тест власної сесії', id:'own'},{title:'Перевірити Cloudflare Worker', id:'worker'},{title:'Перевірити TorrServer', id:'ts_diag'},{title:'Швидкість і буфер відео', id:'ts_speed'},{title:'Зберегти авторизацію TorrServer', id:'ts_auth'},{title:'Очистити авторизацію TorrServer', id:'ts_clear'},{title:'Створити код прив’язки', id:'pair'},{title:'Показати код прив’язки', id:'show_pair'},{title:'Перевірити прив’язку', id:'pair_status'},{title:'Увімкнути діагностику', id:'trace_on'},{title:'Показати журнал', id:'trace_show'},{title:'Вимкнути діагностику', id:'trace_off'}],
+    onSelect: function(item) { mzLog('SELECT', item && item.id ? item.id : 'unknown'); if (item && item.id === 'trace_on') mzEnableTrace(); else if (item && item.id === 'trace_show') mzShowTrace(); else if (item && item.id === 'trace_off') mzDisableTrace(); else if (item && item.id === 'search') searchMazepaPrompt(); else if (item && item.id === 'search_again') searchMazepa(localStorage.getItem('mz_last_query')); else if (item && item.id === 'catalog') publicTrackerPreview(); else if (item && item.id === 'session') sessionCheck(); else if (item && item.id === 'cookie') cookieDiagnostics(); else if (item && item.id === 'own') ownSessionProbe(); else if (item && item.id === 'worker') workerProbe(); else if (item && item.id === 'ts_diag') torrServerDiagnostic(); else if (item && item.id === 'ts_speed') checkPlaybackSpeed(); else if (item && item.id === 'ts_auth') configureTorrserverAuth(); else if (item && item.id === 'ts_clear') clearTorrserverAuth(); else if (item && item.id === 'pair') pairDevice(); else if (item && item.id === 'show_pair') showSavedPairCode(); else if (item && item.id === 'pair_status') pairStatus(); }
   });
 }
 function init() {
