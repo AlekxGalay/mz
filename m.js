@@ -383,8 +383,7 @@ function requestMazepaTorrent(item) {
           var play = function(file) {
             try {
               var url = 'http://192.168.0.110:8090/play/' + encodeURIComponent(status.hash) + '/' + encodeURIComponent(file.id);
-              startPlaybackMonitor(status.hash);
-              notice('TorrServer: попередньо завантажуємо буфер...');
+              notice('TorrServer: готуємо буфер перед запуском...');
               var preload = new XMLHttpRequest();
               var bufferUrl = 'http://192.168.0.110:8090/stream/video?link=' +
                 encodeURIComponent(status.hash) + '&index=' + encodeURIComponent(file.id) + '&preload&stat';
@@ -396,15 +395,50 @@ function requestMazepaTorrent(item) {
                   notice('TorrServer: буфер HTTP ' + preload.status);
                   return;
                 }
-                try {
-                  var stat = JSON.parse(preload.responseText || '{}');
-                  var bytes = Number(stat.preloaded_bytes || 0) / 1048576;
-                  notice('TorrServer: буфер готовий (' + bytes.toFixed(1) + ' МБ)');
-                } catch(e) {
-                  notice('TorrServer: підготовку потоку завершено');
+                var stat;
+                try {stat = JSON.parse(preload.responseText || '{}');}
+                catch(e){notice('TorrServer: некоректний статус буфера');return;}
+                var available = Number(stat.preloaded_bytes || 0);
+                var capacity = Number(stat.preload_size || 0);
+                var bitrate = Number(stat.bit_rate || 0);
+                var wanted = bitrate > 0 ? Math.max(16*1048576,bitrate/8*45) : 32*1048576;
+                if (capacity > 0) wanted = Math.min(wanted,capacity);
+                if (Number(file.length) > 0) wanted = Math.min(wanted,Number(file.length));
+                var mib = function(n){return (n/1048576).toFixed(1);};
+                if (available < wanted) {
+                  notice('TorrServer: підготовлено '+mib(available)+' з '+mib(wanted)+' МБ; перевіряємо буфер...');
+                  var checks = 0;
+                  var poll = function(){
+                    checks++;
+                    var request = new XMLHttpRequest();
+                    request.open('POST','http://192.168.0.110:8090/torrents',true);
+                    request.timeout = 9000;
+                    request.setRequestHeader('Content-Type','application/json');
+                    setTorrAuthorization(request);
+                    request.onload = function(){
+                      if (request.status !== 200) {notice('TorrServer: статус буфера HTTP '+request.status);return;}
+                      var next;
+                      try {next = JSON.parse(request.responseText || '{}');}
+                      catch(e){notice('TorrServer: некоректна статистика');return;}
+                      var filled = Number(next.preloaded_bytes || 0);
+                      if (filled >= wanted) {launch(filled);return;}
+                      if (checks >= 15 || next.stat_string === 'Torrent in db') {
+                        notice('TorrServer: буфер '+mib(filled)+' МБ, недостатньо для стабільного старту');
+                        return;
+                      }
+                      setTimeout(poll,2000);
+                    };
+                    request.onerror = function(){notice('TorrServer: помилка перевірки буфера');};
+                    request.ontimeout = function(){notice('TorrServer: таймаут перевірки буфера');};
+                    request.send(JSON.stringify({action:'get',hash:status.hash}));
+                  };
+                  setTimeout(poll,2000);
+                } else launch(available);
+                function launch(bytes) {
+                  notice('TorrServer: буфер '+mib(bytes)+' МБ — запускаємо');
+                  startPlaybackMonitor(status.hash);
+                  Lampa.Player.play({url:url,title:file.path || item.title});
                 }
-                startPlaybackMonitor(status.hash);
-                Lampa.Player.play({url:url,title:file.path || item.title});
               };
               preload.onerror = function(){notice('TorrServer: не вдалося підготувати буфер');};
               preload.ontimeout = function(){notice('TorrServer: буфер не готовий за 120 секунд');};
