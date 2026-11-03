@@ -355,7 +355,8 @@ function torrServerDiagnostic() {
   var base = 'http://192.168.0.110:8090';
   var checks = [
     {label:'HTTP /echo', method:'GET', path:'/echo'},
-    {label:'HTTP /torrent/list', method:'POST', path:'/torrent/list', body:'{}'}
+    {label:'POST /torrents (list)', method:'POST', path:'/torrents', body:'{"action":"list"}'},
+    {label:'OPTIONS /torrent/upload', method:'OPTIONS', path:'/torrent/upload'}
   ];
   var output = [];
   function next(i) {
