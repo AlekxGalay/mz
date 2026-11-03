@@ -241,7 +241,14 @@ function requestMazepaTorrent(item) {
   xhr.setRequestHeader('Authorization', 'Bearer ' + token);
   xhr.onload = function() {
     if (xhr.status !== 200) {
-      notice('Mazepa: torrent API HTTP ' + xhr.status);
+      var errorMessage = 'HTTP ' + xhr.status;
+      try {
+        var bytes = new Uint8Array(xhr.response || []);
+        var raw = new TextDecoder('utf-8').decode(bytes);
+        var info = JSON.parse(raw);
+        errorMessage = info.error || errorMessage;
+      } catch(e) {}
+      notice('Mazepa: ' + errorMessage);
       return;
     }
     notice('Mazepa: передаємо торрент у TorrServer...');
