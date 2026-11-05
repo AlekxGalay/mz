@@ -825,8 +825,8 @@ function mzParserGet(params, oncomplite, onerror) {
     mzLog('PARSER','пошук «' + q + '»');
     mzWorkerSearch(q, function(err, results) {
       if (err) {onerror('Mazepa: ' + err); return;}
-      if (!results.length && idx < list.length) {next(); return;}
       var f = mzFilterReleases(results);
+      if (!f.list.length && idx < list.length) {next(); return;}
       mzLog('PARSER','знайдено ' + results.length + ', показано ' + f.list.length + ', приховано за розміром ' + f.hiddenSize + ', без UA ' + f.hiddenUa);
       mzReportHidden(f);
       oncomplite({Results: f.list.map(mzToElement)});
