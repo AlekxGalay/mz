@@ -54,6 +54,59 @@ function mergeCookies(...sets) {
   return [...map].map(([k,v]) => k + '=' + v).join('; ');
 }
 
+function stripTags(html) {
+  return String(html || '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// "1.46 GB" / "700 МБ" / "1,2 ТБ" -> байти (0, якщо не розпізнано)
+function parseSize(text) {
+  const m = String(text || '').match(
+    /([\d]+(?:[.,]\d+)?)\s*(TB|GB|MB|KB|ТБ|ГБ|МБ|КБ|B|Б)(?![\p{L}])/iu
+  );
+  if (!m) return 0;
+  const n = parseFloat(m[1].replace(',', '.'));
+  const unit = m[2].toUpperCase();
+  const mult = {
+    TB:1024 ** 4, ТБ:1024 ** 4,
+    GB:1024 ** 3, ГБ:1024 ** 3,
+    MB:1024 ** 2, МБ:1024 ** 2,
+    KB:1024, КБ:1024,
+    B:1, Б:1
+  }[unit] || 0;
+  return Math.round(n * mult);
+}
+
+const MONTHS = {
+  січ:'01', лют:'02', бер:'03', кві:'04', тра:'05', чер:'06',
+  лип:'07', сер:'08', вер:'09', жов:'10', лис:'11', гру:'12'
+};
+
+// "11:51 31-Жов-23" -> "2023-10-31T11:51:00" (порожньо, якщо не розпізнано)
+function parseDate(text) {
+  const m = String(text || '').match(
+    /(\d{2}):(\d{2})\s+(\d{1,2})-([^\s\d-]{3})-(\d{2})/
+  );
+  if (!m) return '';
+  const month = MONTHS[m[4].toLowerCase()];
+  if (!month) return '';
+  return '20' + m[5] + '-' + month + '-' + m[3].padStart(2, '0') +
+    'T' + m[1] + ':' + m[2] + ':00';
+}
+
+function cellText(row, cls) {
+  const re = new RegExp(
+    '<td\\b[^>]*class=["\'][^"\']*\\b' + cls + '\\b[^"\']*["\'][^>]*>([\\s\\S]*?)<\\/td>',
+    'i'
+  );
+  const m = row.match(re);
+  return m ? stripTags(m[1]) : '';
+}
+
 async function cipherKey(admin) {
   const bytes = await crypto.subtle.digest(
     'SHA-256',
@@ -218,7 +271,7 @@ export default {
       return response({
         status:'ok',
         service:'mz-api',
-        version:'0.5',
+        version:'0.6',
         kv:!!env.MZ_SESSIONS,
         admin_secret:!!env.MZ_ADMIN_KEY
       });
@@ -556,6 +609,7 @@ export default {
         }
 
         const results = [];
+        let debugRow = '';
         const rowRe =
           /<tr\b[^>]*\bid=["']tor_[^"']+["'][\s\S]*?<\/tr>/gi;
 
@@ -574,24 +628,37 @@ export default {
 
           if (!dl || !name) continue;
 
-          const title = name[1]
-            .replace(/<[^>]+>/g,' ')
-            .replace(/&nbsp;/g,' ')
-            .replace(/&amp;/g,'&')
-            .replace(/\s+/g,' ')
-            .trim();
+          const title = stripTags(name[1]);
 
           if (title) {
-            results.push({id:dl[1],title});
+            const link = row.match(
+              /<a\b[^>]*href=["']\.\/dl\.php\?id=\d+[^>]*>([\s\S]*?)<\/a>/i
+            );
+            const cells = row.match(/<td\b[^>]*>[\s\S]*?<\/td>/gi) || [];
+            const seeders = parseInt(cellText(row,'seedmed'),10);
+            const leechers = parseInt(cellText(row,'leechmed'),10);
+            results.push({
+              id:dl[1],
+              title,
+              size:link ? parseSize(stripTags(link[1])) : 0,
+              seeders:Number.isFinite(seeders) ? seeders : 0,
+              leechers:Number.isFinite(leechers) ? leechers : 0,
+              date:parseDate(stripTags(cells.length ? cells[cells.length - 1] : ''))
+            });
+            if (results.length === 1 && data.debug === true) {
+              debugRow = row.slice(0, 1500);
+            }
           }
         }
 
-        return response({
+        const out = {
           status:'ok',
           count:results.length,
           results,
           html_size:html.length
-        });
+        };
+        if (debugRow) out.debug_row = debugRow;
+        return response(out);
       } catch {
         return response({error:'Помилка пошуку Mazepa'},502);
       }
