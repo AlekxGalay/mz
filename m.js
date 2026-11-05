@@ -1437,6 +1437,7 @@ function mzDeviceReport(extra) {
     lines.push(['TorrServer /echo', extra.echo]);
   }
   MZ_CODECS.forEach(function(c) {lines.push([c[0], mzCanPlay(c[1])]);});
+  lines.push(['Примітка', 'кодеки — відповідь веб-рушія; плеєр ТВ може підтримувати більше (напр. Dolby Vision)']);
   return lines;
 }
 function mzProbeGet(url, ms, done) {
