@@ -1379,6 +1379,7 @@ function mzInstallPlayerDiag() {
         ', stop_recording=' + !!tl.stop_recording + ', handler=' + (typeof tl.handler);
     }
     Lampa.Player.listener.follow('start', function(d) {
+      if (!mzTraceActive) return;
       cur = d || null; ticks = 0; lastLog = 0;
       var tf = '', pt = '';
       try {tf = Lampa.Storage.field('torrserver_tracktimecode'); pt = Lampa.Storage.field('player_timecode');} catch(e) {}
@@ -1386,6 +1387,7 @@ function mzInstallPlayerDiag() {
     });
     if (Lampa.PlayerVideo && Lampa.PlayerVideo.listener) {
       Lampa.PlayerVideo.listener.follow('timeupdate', function(e) {
+        if (!mzTraceActive || !cur) return;
         ticks++;
         var now = Date.now();
         if (ticks <= 3 || now - lastLog > 60000) {
@@ -1397,6 +1399,7 @@ function mzInstallPlayerDiag() {
       });
     }
     Lampa.Player.listener.follow('destroy', function() {
+      if (!mzTraceActive || !cur) {cur = null; return;}
       var tl = cur && cur.timeline;
       mzLog('PLAYER','destroy: timeline.time=' + (tl && tl.time) + ', percent=' + (tl && tl.percent) +
         ' | file_view → ' + mzFileViewRecord(tl && tl.hash) + ' | localStorage ≈ ' + mzStorageKb() + ' КБ');
