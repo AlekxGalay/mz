@@ -398,10 +398,17 @@ function requestMazepaTorrent(item) {
                 var stat;
                 try {stat = JSON.parse(preload.responseText || '{}');}
                 catch(e){notice('TorrServer: некоректний статус буфера');return;}
-                var available = Number(stat.preloaded_bytes || 0);
-                var capacity = Number(stat.preload_size || 0);
-                var bitrate = Number(stat.bit_rate || 0);
-                var wanted = bitrate > 0 ? Math.max(16*1048576,bitrate/8*45) : 32*1048576;
+                // TorrServer reports bit_rate as a string (bits/second), not bytes/second.
+                // Only accept a plain numeric ffprobe value; never mistake formatted text for bps.
+                var available = Math.max(0, Number(stat.preloaded_bytes) || 0);
+                var capacity = Math.max(0, Number(stat.preload_size) || 0);
+                var rawRate = String(stat.bit_rate || '').trim();
+                var bitrate = /^\\d+(?:\\.\\d+)?$/.test(rawRate) ? Number(rawRate) : 0;
+                // Preload includes data from the END of the file for container metadata.
+                // Therefore preloaded_bytes is NOT equivalent to seconds of uninterrupted video.
+                // A short capped target reduces startup delays; actual streaming still depends on peers.
+                var wanted = bitrate > 0 ? Math.max(12*1048576,bitrate/8*20) : 24*1048576;
+                wanted = Math.min(wanted,48*1048576);
                 if (capacity > 0) wanted = Math.min(wanted,capacity);
                 if (Number(file.length) > 0) wanted = Math.min(wanted,Number(file.length));
                 var mib = function(n){return (n/1048576).toFixed(1);};
@@ -423,7 +430,7 @@ function requestMazepaTorrent(item) {
                       var filled = Number(next.preloaded_bytes || 0);
                       if (filled >= wanted) {launch(filled);return;}
                       if (checks >= 15 || next.stat_string === 'Torrent in db') {
-                        notice('TorrServer: буфер '+mib(filled)+' МБ, недостатньо для стабільного старту');
+                        notice('TorrServer: буфер '+mib(filled)+' / '+mib(wanted)+' МБ; стан: '+(next.stat_string || 'невідомий')+'. Перевір піри та кеш');
                         return;
                       }
                       setTimeout(poll,2000);
