@@ -2,7 +2,6 @@
 'use strict';
 if (window.mazepaPluginM1) return;
 window.mazepaPluginM1 = true;
-var HOME = 'https://mazepa.to/';
 var mzTrace = [];
 var mzTraceActive = false;
 function mzLog(type, detail) {
@@ -94,64 +93,6 @@ var mzSearchBusy = false;
 function notice(message) {
   try { if (window.Lampa && Lampa.Noty) Lampa.Noty.show(message); } catch (e) {}
 }
-function sessionCheck() {
-  notice('Mazepa: перевірка доступу...');
-  var request = new XMLHttpRequest();
-  request.open('GET', HOME + 'tracker.php', true);
-  request.withCredentials = true;
-  request.timeout = 12000;
-  request.onload = function () {
-    var path = '';
-    try { path = new URL(request.responseURL || HOME + 'tracker.php').pathname; } catch (e) {}
-    var loginPage = /login\.php/i.test(path);
-    try {
-      var page = new DOMParser().parseFromString(request.responseText || '', 'text/html');
-      loginPage = loginPage || !!page.querySelector('input[name="login_password"]');
-    } catch (e) {}
-    notice(request.status === 200 && !loginPage ? 'Mazepa: доступ підтверджено' : 'Mazepa: потрібен вхід');
-  };
-  request.onerror = function () { notice('Mazepa: помилка мережі або CORS'); };
-  request.ontimeout = function () { notice('Mazepa: таймаут'); };
-  request.send();
-}
-function cookieDiagnostics() {
-  notice('Mazepa: перевіряємо доступ до cookies...');
-  var xhr = new XMLHttpRequest();
-  xhr.open('GET', HOME + 'tracker.php?mzcheck=' + Date.now(), true);
-  xhr.withCredentials = true;
-  xhr.timeout = 12000;
-  xhr.onload = function () {
-    var body = xhr.responseText || '';
-    var login = /login_username|login_password|name=["']login["']/i.test(body) || /login\\.php/i.test(xhr.responseURL || '');
-    var msg = 'Mazepa cookie: HTTP ' + xhr.status + ', ' + (login ? 'сесія не передалася' : 'сторінка не схожа на форму входу');
-    notice(msg);
-  };
-  xhr.onerror = function(){notice('Mazepa cookie: запит заблокований (мережа/CORS)');};
-  xhr.ontimeout = function(){notice('Mazepa cookie: таймаут');};
-  xhr.send();
-}
-function ownSessionProbe() {
-  notice('Mazepa: перевірка власної сесії Lampa...');
-  function request(path, done) {
-    var x = new XMLHttpRequest();
-    x.open('GET', HOME + path, true);
-    x.withCredentials = true;
-    x.timeout = 12000;
-    x.onload = function(){done(null, x);};
-    x.onerror = function(){done('CORS/мережа');};
-    x.ontimeout = function(){done('таймаут');};
-    x.send();
-  }
-  request('login.php?mzprobe=' + Date.now(), function(err, first) {
-    if (err) {notice('Mazepa: login.php — ' + err);return;}
-    request('tracker.php?mzprobe=' + Date.now(), function(err2, second) {
-      if (err2) {notice('Mazepa: tracker.php — ' + err2);return;}
-      var body = second.responseText || '';
-      var login = /login_username|login_password/i.test(body) || /login\\.php/i.test(second.responseURL || '');
-      notice('Mazepa: login HTTP ' + first.status + ', tracker HTTP ' + second.status + '; ' + (login ? 'вхід потрібен' : 'перевір сторінку'));
-    });
-  });
-}
 function workerProbe() {
   notice('Mazepa: перевіряємо Cloudflare Worker...');
   var x = new XMLHttpRequest();
@@ -223,57 +164,6 @@ function pairStatus() {
   };
   x.onerror = function(){notice('Mazepa: Worker недоступний');};
   x.send(JSON.stringify({device_secret:secret}));
-}
-function publicTrackerPreview() {
-  notice('Mazepa: завантажуємо відкритий каталог...');
-  var x = new XMLHttpRequest();
-  x.open('GET', HOME + 'tracker.php?pid=-1', true);
-  x.timeout = 15000;
-  x.onload = function() {
-    if (x.status !== 200) { notice('Mazepa: HTTP ' + x.status); return; }
-    try {
-      var doc = new DOMParser().parseFromString(x.responseText || '', 'text/html');
-      if (/login\\.php/i.test(x.responseURL || '') || doc.querySelector('input[name="login_password"]')) { notice('Mazepa: потрібна авторизація на трекері'); return; }
-      var links = doc.querySelectorAll('a[href*="topic-"], a[href*="viewtopic.php"]');
-      var items = [];
-      var seen = {};
-      for (var i = 0; i < links.length && items.length < 30; i++) {
-        var el = links[i];
-        var title = (el.textContent || '').replace(/\\s+/g,' ').trim();
-        if (title.length < 8 || seen[title]) continue;
-        seen[title] = true;
-        items.push({title:title, id:'release_' + items.length});
-      }
-      if (!items.length) {
-        var pageTitle = (doc.title || '').slice(0, 90);
-        var body = (doc.body && doc.body.textContent || '').replace(/\\s+/g,' ').trim();
-        var pageType = /увійти|пароль|авторизац/i.test(body.slice(0,900)) ? 'можлива сторінка входу' : /cloudflare|checking your browser|access denied/i.test(body.slice(0,900)) ? 'захист сайту' : 'невідомий вміст';
-        mzShow({
-          title:'Mazepa — діагностика каталогу',
-          items:[
-            {title:'HTTP: ' + x.status},
-            {title:'Розмір відповіді: ' + (x.responseText || '').length + ' символів'},
-            {title:'HTML-посилань: ' + doc.querySelectorAll('a[href]').length},
-            {title:'Посилань на релізи: ' + links.length},
-            {title:'Сторінка: ' + (pageTitle || 'без назви')},
-            {title:'Тип відповіді: ' + pageType}
-          ],
-          onSelect:function(){},
-          onBack:function(){openMenu();}
-        });
-        return;
-      }
-      mzShow({
-        title:'Mazepa — відкритий каталог (' + items.length + ')',
-        items:items,
-        onSelect:function(item){notice(item.title);},
-        onBack:function(){openMenu();}
-      });
-    } catch(e) { notice('Mazepa: помилка обробки каталогу'); }
-  };
-  x.onerror = function(){notice('Mazepa: каталог заблокований мережею/CORS');};
-  x.ontimeout = function(){notice('Mazepa: таймаут каталогу');};
-  x.send();
 }
 var torrAuth = {user:'',pass:''};
 try {
@@ -708,13 +598,83 @@ function torrServerDiagnostic() {
   notice('TorrServer: перевіряємо доступ...');
   next(0);
 }
+// ===== Меню плагіна: головне + групи =====
+// buildItems() повертає [{title, subtitle?, run, again?}]; again — після дії відкрити це ж меню знову (оновлені підписи)
+function mzMenuShow(title, buildItems, parent) {
+  mzShow({
+    title: title,
+    items: buildItems().map(function(it, i) {return {title: it.title, subtitle: it.subtitle, id: i};}),
+    onSelect: function(item) {
+      var it = buildItems()[item && item.id];
+      if (!it) return;
+      mzLog('SELECT', title + ' → ' + it.title);
+      it.run();
+      if (it.again) setTimeout(function() {mzMenuShow(title, buildItems, parent);}, 0);
+    },
+    onBack: function() {if (parent) parent();}
+  });
+}
+function mzMenuFilters() {
+  mzMenuShow('Фільтри й рівні', function() {
+    return [
+      {title: 'Рівень 0 — понад ' + (mzMaxSizeGb() > 0 ? mzMaxSizeGb() + ' ГБ' : '(вимкнено)'), subtitle: 'змінити поріг розміру', run: mzEditMaxSize},
+      {title: 'Лише українська озвучка: ' + (mzOnlyUa() ? 'так' : 'ні'), run: mzToggleOnlyUa, again: true},
+      {title: 'Рівень за замовчуванням: ' + (mzBestOnly() ? 'авто (найвищий)' : 'усі'), run: mzToggleBestOnly, again: true}
+    ];
+  }, openMenu);
+}
+function mzMenuRows() {
+  mzMenuShow('Рядки на головній', function() {
+    return [
+      {title: 'Статус рядків', run: mzShowRowStatus},
+      {title: 'Оновити рядки', run: mzResetRows}
+    ];
+  }, openMenu);
+}
+function mzMenuTorr() {
+  mzMenuShow('TorrServer', function() {
+    return [
+      {title: 'Адреса: ' + (torrBase() || 'не задано'), run: configureTorrserverUrl},
+      {title: 'Синхронізувати з налаштуваннями Lampa', run: mzSyncLampaTorrserver},
+      {title: 'Зберегти логін і пароль', run: configureTorrserverAuth},
+      {title: 'Очистити логін і пароль', run: clearTorrserverAuth},
+      {title: 'Перевірити TorrServer', run: torrServerDiagnostic}
+    ];
+  }, openMenu);
+}
+function mzMenuPair() {
+  mzMenuShow('Прив’язка телевізора', function() {
+    return [
+      {title: 'Створити код прив’язки', run: pairDevice},
+      {title: 'Показати код прив’язки', run: showSavedPairCode},
+      {title: 'Перевірити прив’язку', run: pairStatus}
+    ];
+  }, openMenu);
+}
+function mzMenuDiag() {
+  mzMenuShow('Діагностика', function() {
+    return [
+      {title: 'Журнал діагностики: ' + (mzTraceActive ? 'увімкнено' : 'вимкнено'), run: function() {if (mzTraceActive) mzDisableTrace(); else mzEnableTrace();}, again: true},
+      {title: 'Показати журнал', run: mzShowTrace},
+      {title: 'Перевірити Cloudflare Worker', run: workerProbe},
+      {title: 'Швидкість і буфер відео', run: checkPlaybackSpeed},
+      {title: 'Журнал зависань відео', run: showPlaybackJournal}
+    ];
+  }, openMenu);
+}
 function openMenu() {
   mzLog('SCREEN','main menu opened (openMenu викликано)');
-  mzShow({
-    title: 'Mazepa',
-    items: [{title:'Пошук торрентів Mazepa', id:'search'},{title:'Повторити останній пошук', id:'search_again'},{title:'Відкритий каталог Mazepa (тест)', id:'catalog'},{title:'Перевірити сесію Mazepa.to', id:'session'},{title:'Діагностика cookies', id:'cookie'},{title:'Тест власної сесії', id:'own'},{title:'Перевірити Cloudflare Worker', id:'worker'},{title:'Перевірити TorrServer', id:'ts_diag'},{title:'Швидкість і буфер відео', id:'ts_speed'},{title:'Журнал зависань відео', id:'ts_journal'},{title:'Рівень 0 — понад ' + (mzMaxSizeGb() > 0 ? mzMaxSizeGb() + ' ГБ' : '(вимкнено)'), id:'f_size'},{title:'Лише українська озвучка: ' + (mzOnlyUa() ? 'так' : 'ні'), id:'f_ua'},{title:'Рівень за замовчуванням: ' + (mzBestOnly() ? 'авто (найвищий)' : 'усі'), id:'f_best'},{title:'Статус рядків на головній', id:'rows_status'},{title:'Оновити рядки на головній', id:'rows_reset'},{title:'Адреса TorrServer', id:'ts_url'},{title:'Синхронізувати TorrServer з Lampa', id:'ts_sync'},{title:'Зберегти авторизацію TorrServer', id:'ts_auth'},{title:'Очистити авторизацію TorrServer', id:'ts_clear'},{title:'Створити код прив’язки', id:'pair'},{title:'Показати код прив’язки', id:'show_pair'},{title:'Перевірити прив’язку', id:'pair_status'},{title:'Увімкнути діагностику', id:'trace_on'},{title:'Показати журнал', id:'trace_show'},{title:'Вимкнути діагностику', id:'trace_off'}],
-    onSelect: function(item) { mzLog('SELECT', item && item.id ? item.id : 'unknown'); if (item && item.id === 'trace_on') mzEnableTrace(); else if (item && item.id === 'trace_show') mzShowTrace(); else if (item && item.id === 'trace_off') mzDisableTrace(); else if (item && item.id === 'search') searchMazepaPrompt(); else if (item && item.id === 'search_again') searchMazepa(localStorage.getItem('mz_last_query')); else if (item && item.id === 'catalog') publicTrackerPreview(); else if (item && item.id === 'session') sessionCheck(); else if (item && item.id === 'cookie') cookieDiagnostics(); else if (item && item.id === 'own') ownSessionProbe(); else if (item && item.id === 'worker') workerProbe(); else if (item && item.id === 'ts_diag') torrServerDiagnostic(); else if (item && item.id === 'ts_speed') checkPlaybackSpeed(); else if (item && item.id === 'ts_journal') showPlaybackJournal(); else if (item && item.id === 'f_size') mzEditMaxSize(); else if (item && item.id === 'f_ua') mzToggleOnlyUa(); else if (item && item.id === 'f_best') mzToggleBestOnly(); else if (item && item.id === 'rows_status') mzShowRowStatus(); else if (item && item.id === 'rows_reset') mzResetRows(); else if (item && item.id === 'ts_url') configureTorrserverUrl(); else if (item && item.id === 'ts_sync') mzSyncLampaTorrserver(); else if (item && item.id === 'ts_auth') configureTorrserverAuth(); else if (item && item.id === 'ts_clear') clearTorrserverAuth(); else if (item && item.id === 'pair') pairDevice(); else if (item && item.id === 'show_pair') showSavedPairCode(); else if (item && item.id === 'pair_status') pairStatus(); }
-  });
+  mzMenuShow('Mazepa', function() {
+    return [
+      {title: 'Пошук торрентів Mazepa', run: searchMazepaPrompt},
+      {title: 'Повторити останній пошук', run: function() {searchMazepa(localStorage.getItem('mz_last_query'));}},
+      {title: 'Фільтри й рівні', run: mzMenuFilters},
+      {title: 'Рядки на головній', run: mzMenuRows},
+      {title: 'TorrServer', run: mzMenuTorr},
+      {title: 'Прив’язка телевізора', run: mzMenuPair},
+      {title: 'Діагностика', run: mzMenuDiag}
+    ];
+  }, null);
 }
 // ===== Рівні якості й фільтри =====
 // Рівень 0: понад ліміт розміру · 1: 4K (HDR, або 4K без HDR з позначкою [SDR])
