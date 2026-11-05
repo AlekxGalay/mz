@@ -670,6 +670,7 @@ function mzMenuDiag() {
   mzMenuShow('Діагностика', function() {
     return [
       {title: 'Журнал діагностики: ' + (mzTraceActive ? 'увімкнено' : 'вимкнено'), run: function() {if (mzTraceActive) mzDisableTrace(); else mzEnableTrace();}, again: true},
+      {title: 'Про пристрій і сумісність', subtitle: 'версія, кодеки, доступ до Worker і TorrServer', run: mzShowDevice},
       {title: 'Показати журнал', run: mzShowTrace},
       {title: 'Перевірити Cloudflare Worker', run: workerProbe},
       {title: 'Швидкість і буфер відео', run: checkPlaybackSpeed},
@@ -1385,6 +1386,111 @@ function mzInstallPlayerDiag() {
   } catch(e) {mzLog('PLAYER','діагностика недоступна: ' + e);}
 }
 
+// ===== Про пристрій і сумісність (для різних моделей ТВ) =====
+// Версія рушія → покоління webOS (за таблицею LG: 108 → webOS 24, 120 → 25, 132 → 26). Це підказка, не гарантія.
+var MZ_WEBOS_BY_CHROME = {108: 'webOS 24 (2024)', 120: 'webOS 25 (2025)', 132: 'webOS 26 (2026)'};
+function mzParseUa(ua) {
+  ua = String(ua || '');
+  var m = ua.match(/Chrome\/(\d+)/);
+  var chrome = m ? parseInt(m[1], 10) : 0;
+  var isWebos = /Web0S|webOS/i.test(ua);
+  var isTizen = /Tizen/i.test(ua);
+  var family = isWebos ? 'LG webOS' : (isTizen ? 'Samsung Tizen' : 'інший');
+  var gen = isWebos && chrome ? (MZ_WEBOS_BY_CHROME[chrome] || 'покоління невідоме (Chromium ' + chrome + ')') : '';
+  return {family: family, chrome: chrome, generation: gen};
+}
+function mzCanPlay(type) {
+  try {
+    var v = document.createElement('video');
+    var r = v.canPlayType(type);
+    return r === 'probably' ? 'так' : (r === 'maybe' ? 'можливо' : 'ні');
+  } catch(e) {return '?';}
+}
+var MZ_CODECS = [
+  ['H.264', 'video/mp4; codecs="avc1.640028"'],
+  ['HEVC (HDR10)', 'video/mp4; codecs="hvc1.2.4.L150.B0"'],
+  ['VP9', 'video/webm; codecs="vp09.00.10.08"'],
+  ['AV1', 'video/mp4; codecs="av01.0.08M.10"'],
+  ['Dolby Vision', 'video/mp4; codecs="dvh1.05.06"'],
+  ['AAC', 'audio/mp4; codecs="mp4a.40.2"'],
+  ['AC-3', 'audio/mp4; codecs="ac-3"'],
+  ['E-AC-3 (DD+)', 'audio/mp4; codecs="ec-3"'],
+  ['DTS', 'audio/mp4; codecs="dtsc"'],
+  ['Opus', 'audio/webm; codecs="opus"'],
+  ['FLAC', 'audio/flac']
+];
+function mzDeviceReport(extra) {
+  var ua = (typeof navigator !== 'undefined' && navigator.userAgent) || '';
+  var p = mzParseUa(ua);
+  var lines = [];
+  lines.push(['Пристрій', p.family + (p.chrome ? ', Chromium ' + p.chrome : '') + (p.generation ? ' → ' + p.generation : '')]);
+  var lv = '', pf = '';
+  try {lv = Lampa.Manifest && Lampa.Manifest.app_version;} catch(e) {}
+  try {pf = Lampa.Platform && Lampa.Platform.get && Lampa.Platform.get();} catch(e) {}
+  lines.push(['Lampa', (lv || 'версія невідома') + (pf ? ', платформа ' + pf : '')]);
+  try {lines.push(['Екран', window.screen.width + '×' + window.screen.height + ', DPR ' + (window.devicePixelRatio || 1)]);} catch(e) {}
+  lines.push(['localStorage', mzStorageKb() + ' КБ зайнято']);
+  lines.push(['Токен прив’язки', localStorage.getItem('mz_device_token') ? 'є' : 'немає']);
+  lines.push(['TorrServer', torrBase() || 'адресу не задано']);
+  if (extra) {
+    lines.push(['Worker', extra.worker]);
+    lines.push(['TorrServer /echo', extra.echo]);
+  }
+  MZ_CODECS.forEach(function(c) {lines.push([c[0], mzCanPlay(c[1])]);});
+  return lines;
+}
+function mzProbeGet(url, ms, done) {
+  var x = new XMLHttpRequest();
+  x.open('GET', url, true);
+  x.timeout = ms;
+  x.onload = function() {done(x.status, (x.responseText || '').slice(0, 200));};
+  x.onerror = function() {done(0, '');};
+  x.ontimeout = function() {done(-1, '');};
+  x.send();
+}
+function mzShowDevice() {
+  notice('Mazepa: збираю дані про пристрій...');
+  var extra = {worker: '…', echo: '…'};
+  var pending = 2, shown = false;
+  function finish() {
+    if (shown) return;
+    shown = true;
+    var lines = mzDeviceReport(extra);
+    mzLog('DEVICE', lines.map(function(l) {return l[0] + '=' + l[1];}).join(' | '));
+    mzShow({
+      title: 'Про пристрій і сумісність',
+      items: lines.map(function(l) {return {title: l[0] + ': ' + l[1], noenter: true};}),
+      onSelect: function() {},
+      onBack: function() {mzMenuDiag();}
+    });
+  }
+  function one() {if (--pending === 0) finish();}
+  mzProbeGet(API + '/health', 8000, function(status, text) {
+    if (status === 200) {
+      var d = null; try {d = JSON.parse(text);} catch(e) {}
+      extra.worker = d ? ('v' + d.version + ', OMDb ' + (d.omdb ? 'є' : 'немає') + ', KV ' + (d.kv ? 'є' : 'немає')) : 'відповідь некоректна';
+    } else extra.worker = status === 0 ? 'недоступний (мережа/CORS)' : (status === -1 ? 'таймаут' : 'HTTP ' + status);
+    one();
+  });
+  var base = torrBase();
+  if (!base) {extra.echo = 'адресу не задано'; one();}
+  else mzProbeGet(base + '/echo', 6000, function(status, text) {
+    extra.echo = status === 200 ? ('відповідає: ' + text.replace(/\s+/g, ' ').trim().slice(0, 40)) :
+      (status === 0 ? 'недоступний (мережа, змішаний вміст чи CORS)' : (status === -1 ? 'таймаут' : 'HTTP ' + status));
+    one();
+  });
+  setTimeout(finish, 10000);
+}
+// Непіймані помилки — у журнал (лише коли діагностика ввімкнена): допомагає на ТВ, до яких немає доступу
+function mzInstallErrorCapture() {
+  try {
+    window.addEventListener('error', function(e) {
+      if (!mzTraceActive) return;
+      mzLog('ERROR', String(e && e.message || '') + ' @ ' + String((e && e.filename) || '').split('/').pop() + ':' + (e && e.lineno));
+    });
+  } catch(e) {}
+}
+
 var mzLastCardTap = 0;
 function addCardButton(e) {
   if (!e || e.type !== 'complite' || !window.$) return;
@@ -1427,6 +1533,7 @@ function init() {
   });
   mzInstallHooks();
   mzInstallPlayerDiag();
+  mzInstallErrorCapture();
   mzAddRows();
   try {Lampa.Listener.follow('full', addCardButton);} catch(err) {mzLog('CARD','listener error');}
   notice('Mazepa: плагін завантажено');
