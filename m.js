@@ -15,6 +15,19 @@ function mzKey(event) {
   var code = event.keyCode || event.which;
   var names = {8:'BACK',27:'BACK/ESC',13:'OK',37:'LEFT',38:'UP',39:'RIGHT',40:'DOWN',461:'WEBOS_BACK',10009:'TV_BACK'};
   if (names[code]) mzLog('KEY', names[code] + ' (' + code + ')');
+  if (code === 8 || code === 27 || code === 461 || code === 10009) {
+    setTimeout(function() {
+      try {
+        var ctrl = Lampa.Controller.enabled().name;
+        var act = Lampa.Activity.active();
+        var cls = [];
+        ['selectbox--open','settings--open','menu--open'].forEach(function(c) {
+          if (document.body && document.body.classList.contains(c)) cls.push(c);
+        });
+        mzLog('STATE', 'після Back: controller=' + ctrl + ' | activity=' + (act && act.component) + (cls.length ? ' | ' + cls.join(',') : ''));
+      } catch(err) {mzLog('STATE','недоступно: ' + err);}
+    }, 200);
+  }
 }
 function mzEnableTrace() {
   mzTraceActive = true;
@@ -566,7 +579,7 @@ function searchMazepa(query, opts) {
       onSelect:function(item) {
         if (item) requestMazepaTorrent(item);
       },
-      onBack:function(){if (!opts.fromCard) openMenu();}
+      onBack:function(){mzLog('BACK','results list; fromCard=' + !!opts.fromCard);if (!opts.fromCard) openMenu();}
     });
   };
   x.onerror = function(){notice('Mazepa: немає зв’язку з Worker');};
@@ -657,7 +670,7 @@ function torrServerDiagnostic() {
   next(0);
 }
 function openMenu() {
-  mzLog('SCREEN','main menu opened');
+  mzLog('SCREEN','main menu opened (openMenu викликано)');
   Lampa.Select.show({
     title: 'Mazepa',
     items: [{title:'Пошук торрентів Mazepa', id:'search'},{title:'Повторити останній пошук', id:'search_again'},{title:'Відкритий каталог Mazepa (тест)', id:'catalog'},{title:'Перевірити сесію Mazepa.to', id:'session'},{title:'Діагностика cookies', id:'cookie'},{title:'Тест власної сесії', id:'own'},{title:'Перевірити Cloudflare Worker', id:'worker'},{title:'Перевірити TorrServer', id:'ts_diag'},{title:'Швидкість і буфер відео', id:'ts_speed'},{title:'Журнал зависань відео', id:'ts_journal'},{title:'Адреса TorrServer', id:'ts_url'},{title:'Зберегти авторизацію TorrServer', id:'ts_auth'},{title:'Очистити авторизацію TorrServer', id:'ts_clear'},{title:'Створити код прив’язки', id:'pair'},{title:'Показати код прив’язки', id:'show_pair'},{title:'Перевірити прив’язку', id:'pair_status'},{title:'Увімкнути діагностику', id:'trace_on'},{title:'Показати журнал', id:'trace_show'},{title:'Вимкнути діагностику', id:'trace_off'}],
