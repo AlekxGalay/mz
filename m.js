@@ -524,9 +524,24 @@ function searchMazepaPrompt() {
     value:localStorage.getItem('mz_last_query') || '',
     free:true
   }, function(value) {
-    if (String(value || '').trim()) searchMazepa(value);
+    if (String(value || '').trim()) mzSearchFromMenu(value);
     else openMenu();
   });
+}
+// Пошук без картки фільму: штатний екран торрентів Lampa сам підставляє movie = {title: пошук} при from_search.
+// Запасний варіант (Lampa не дозволила підмінити Parser/Torrent або екран не відкрився) — спливаючий список.
+function mzSearchFromMenu(query) {
+  query = String(query || '').trim();
+  if (!query) {notice('Mazepa: введи назву фільму або серіалу'); return;}
+  try {localStorage.setItem('mz_last_query', query);} catch(e) {}
+  if (mzHooks.parser && mzHooks.torrent && window.Lampa && Lampa.Activity && Lampa.Activity.push) {
+    try {
+      mzLog('SEARCH','меню → штатний екран: «' + query + '»');
+      Lampa.Activity.push({url: '', title: 'Mazepa', component: 'torrents', search: query, search_one: query, search_two: query, from_search: true, page: 1, mz_only: true});
+      return;
+    } catch(e) {mzLog('SEARCH','штатний екран не відкрився: ' + e);}
+  }
+  searchMazepa(query);
 }
 function checkPlaybackSpeed() {
   if (!torrReady()) return;
@@ -667,7 +682,7 @@ function openMenu() {
   mzMenuShow('Mazepa', function() {
     return [
       {title: 'Пошук торрентів Mazepa', run: searchMazepaPrompt},
-      {title: 'Повторити останній пошук', run: function() {searchMazepa(localStorage.getItem('mz_last_query'));}},
+      {title: 'Повторити останній пошук', run: function() {mzSearchFromMenu(localStorage.getItem('mz_last_query'));}},
       {title: 'Фільтри й рівні', run: mzMenuFilters},
       {title: 'Рядки на головній', run: mzMenuRows},
       {title: 'TorrServer', run: mzMenuTorr},
@@ -877,7 +892,8 @@ function mzParserGet(params, oncomplite, onerror) {
     mzWorkerSearch(q, function(err, results) {
       if (err) {onerror('Mazepa: ' + err); return;}
       var mv = params.movie || {};
-      var isSeries = !!(mv.number_of_seasons || mv.first_air_date || mv.original_name);
+      // для пошуку без картки (from_search) тип невідомий — як і для серіалів, за замовчуванням показуємо всі рівні
+      var isSeries = !!(mv.number_of_seasons || mv.first_air_date || mv.original_name || params.from_search);
       var f = mzFilterReleases(results, {level: params.mz_level, series: isSeries});
       if (!f.list.length && idx < list.length) {next(); return;}
       mzLog('PARSER','знайдено ' + results.length + ', показано ' + f.list.length + ', рівень ' + f.level + (f.auto ? ' (авто)' : '') + ', без UA ' + f.hiddenUa);
