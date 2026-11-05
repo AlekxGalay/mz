@@ -258,6 +258,69 @@ document.getElementById('login').onsubmit=e=>{
   });
 }
 
+// Розбір рядків tracker.php -> [{id,title,size,seeders,leechers,date}]
+function parseTrackerRows(html, limit, wantDebug) {
+  const results = [];
+  let debugRow = '';
+  const rowRe = /<tr\b[^>]*\bid=["']tor_[^"']+["'][\s\S]*?<\/tr>/gi;
+  let match;
+
+  while ((match = rowRe.exec(html)) && results.length < limit) {
+    const row = match[0];
+    const dl = row.match(/href=["']\.\/dl\.php\?id=(\d+)/i);
+    const name = row.match(
+      /<a\b[^>]*class=["'][^"']*(?:genmed|seedmed|leechmed)[^"']*["'][^>]*>([\s\S]*?)<\/a>/i
+    );
+
+    if (!dl || !name) continue;
+
+    const title = stripTags(name[1]);
+    if (!title) continue;
+
+    const link = row.match(
+      /<a\b[^>]*href=["']\.\/dl\.php\?id=\d+[^>]*>([\s\S]*?)<\/a>/i
+    );
+    const cells = row.match(/<td\b[^>]*>[\s\S]*?<\/td>/gi) || [];
+    const seeders = parseInt(cellText(row, 'seedmed'), 10);
+    const leechers = parseInt(cellText(row, 'leechmed'), 10);
+
+    results.push({
+      id: dl[1],
+      title,
+      size: link ? parseSize(stripTags(link[1])) : 0,
+      seeders: Number.isFinite(seeders) ? seeders : 0,
+      leechers: Number.isFinite(leechers) ? leechers : 0,
+      date: parseDate(stripTags(cells.length ? cells[cells.length - 1] : ''))
+    });
+
+    if (results.length === 1 && wantDebug) debugRow = row.slice(0, 1500);
+  }
+
+  return {results, debugRow};
+}
+
+// Розділи Mazepa з фільмами/серіалами/мультфільмами/документальними/аніме (за Jackett mazepa.yml)
+const FEED_CATS = [
+  37, 7, 38, 8, 35, 5, 36, 6, 39, 9,
+  175, 147, 12, 13, 174, 152, 44, 14, 155, 41, 10, 43, 11, 16, 157, 42, 15
+];
+
+function trackerForm(cats, sortField, query) {
+  const form = new URLSearchParams();
+  (cats && cats.length ? cats : [-1]).forEach(c => form.append('f[]', String(c)));
+  const fixed = {
+    prev_allw:'1', prev_a:'0', prev_dla:'0', prev_dlc:'0', prev_dld:'0',
+    prev_dlw:'0', prev_my:'0', prev_new:'0', prev_sd:'0', prev_da:'1',
+    prev_dc:'0', prev_df:'1', prev_ds:'0', prev_tor_type:'0',
+    o:String(sortField), s:'2',
+    dc:'0', df:'1', da:'1', ds:'0',
+    tm:'-1', sns:'-1', srg:'-1',
+    nm:query || '', allw:'1'
+  };
+  Object.keys(fixed).forEach(k => form.append(k, fixed[k]));
+  return form;
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -271,9 +334,10 @@ export default {
       return response({
         status:'ok',
         service:'mz-api',
-        version:'0.6',
+        version:'0.7',
         kv:!!env.MZ_SESSIONS,
-        admin_secret:!!env.MZ_ADMIN_KEY
+        admin_secret:!!env.MZ_ADMIN_KEY,
+        omdb:!!env.OMDB_KEY
       });
     }
 
@@ -608,48 +672,9 @@ export default {
           },401);
         }
 
-        const results = [];
-        let debugRow = '';
-        const rowRe =
-          /<tr\b[^>]*\bid=["']tor_[^"']+["'][\s\S]*?<\/tr>/gi;
-
-        let match;
-
-        while ((match = rowRe.exec(html)) && results.length < 50) {
-          const row = match[0];
-
-          const dl = row.match(
-            /href=["']\.\/dl\.php\?id=(\d+)/i
-          );
-
-          const name = row.match(
-            /<a\b[^>]*class=["'][^"']*(?:genmed|seedmed|leechmed)[^"']*["'][^>]*>([\s\S]*?)<\/a>/i
-          );
-
-          if (!dl || !name) continue;
-
-          const title = stripTags(name[1]);
-
-          if (title) {
-            const link = row.match(
-              /<a\b[^>]*href=["']\.\/dl\.php\?id=\d+[^>]*>([\s\S]*?)<\/a>/i
-            );
-            const cells = row.match(/<td\b[^>]*>[\s\S]*?<\/td>/gi) || [];
-            const seeders = parseInt(cellText(row,'seedmed'),10);
-            const leechers = parseInt(cellText(row,'leechmed'),10);
-            results.push({
-              id:dl[1],
-              title,
-              size:link ? parseSize(stripTags(link[1])) : 0,
-              seeders:Number.isFinite(seeders) ? seeders : 0,
-              leechers:Number.isFinite(leechers) ? leechers : 0,
-              date:parseDate(stripTags(cells.length ? cells[cells.length - 1] : ''))
-            });
-            if (results.length === 1 && data.debug === true) {
-              debugRow = row.slice(0, 1500);
-            }
-          }
-        }
+        const parsed = parseTrackerRows(html, 50, data.debug === true);
+        const results = parsed.results;
+        const debugRow = parsed.debugRow;
 
         const out = {
           status:'ok',
@@ -661,6 +686,132 @@ export default {
         return response(out);
       } catch {
         return response({error:'Помилка пошуку Mazepa'},502);
+      }
+    }
+
+    // AUTHORIZED FEED: нові релізи або топ за сідами (фільми, серіали, мультфільми...)
+    if (path === '/mazepa/feed' && request.method === 'POST') {
+      if (!await authenticated(env,request)) {
+        return response({error:'Телевізор не авторизований'},401);
+      }
+
+      const saved = await env.MZ_SESSIONS.get('mazepa:session');
+
+      if (!saved) {
+        return response({error:'Увійди в Mazepa на сторінці /pair'},409);
+      }
+
+      const data = await body(request);
+      const kind = data.kind === 'top' ? 'top' : 'new';
+      const limit = Math.min(Math.max(parseInt(data.limit,10) || 30, 1), 50);
+      const cacheKey = 'feed:' + kind + ':' + limit;
+
+      try {
+        const cached = await env.MZ_SESSIONS.get(cacheKey,'json');
+        if (cached) return response({...cached, cached:true});
+
+        const cookie = await unseal(saved,env.MZ_ADMIN_KEY);
+        const form = trackerForm(FEED_CATS, kind === 'top' ? 10 : 1, '');
+
+        const fetched = await fetchMazepa('tracker.php',cookie,{
+          method:'POST',
+          headers:{'Content-Type':'application/x-www-form-urlencoded'},
+          body:form.toString()
+        });
+        const html = await fetched.text();
+
+        if (fetched.status !== 200) {
+          return response({error:'Помилка каталогу Mazepa',http:fetched.status},502);
+        }
+
+        if (/login_username|login_password/.test(html)) {
+          return response({error:'Сесія Mazepa завершилась. Увійди повторно'},401);
+        }
+
+        const parsed = parseTrackerRows(html, limit, data.debug === true);
+        const out = {
+          status:'ok',
+          kind,
+          count:parsed.results.length,
+          results:parsed.results
+        };
+
+        if (parsed.results.length) {
+          await env.MZ_SESSIONS.put(cacheKey, JSON.stringify(out), {expirationTtl:600});
+        }
+        if (parsed.debugRow) out.debug_row = parsed.debugRow;
+        return response(out);
+      } catch {
+        return response({error:'Помилка стрічки Mazepa'},502);
+      }
+    }
+
+    // AUTHORIZED IMDB RATING (OMDb); ключ лише в секреті OMDB_KEY
+    if (path === '/imdb' && request.method === 'POST') {
+      if (!await authenticated(env,request)) {
+        return response({error:'Телевізор не авторизований'},401);
+      }
+
+      if (!env.OMDB_KEY) {
+        return response({error:'OMDb не налаштовано (секрет OMDB_KEY)'},503);
+      }
+
+      const data = await body(request);
+      const clean = v => String(v || '').replace(/\s+/g,' ').trim().slice(0,150);
+      const title = clean(data.title);
+      const original = clean(data.original);
+      const year = /^(19|20)\d{2}$/.test(String(data.year || '')) ? String(data.year) : '';
+      const type = data.series ? 'series' : 'movie';
+      const names = [original, title].filter((n,i,a) => n && a.indexOf(n) === i);
+
+      if (!names.length) {
+        return response({error:'Порожня назва'},400);
+      }
+
+      try {
+        const cacheKey = 'imdb:' + await sha(names.join('|') + '|' + year + '|' + type);
+        const cached = await env.MZ_SESSIONS.get(cacheKey,'json');
+        if (cached) return response({...cached, cached:true});
+
+        let found = null;
+
+        for (const name of names) {
+          for (const y of (year ? [year, ''] : [''])) {
+            const url = 'https://www.omdbapi.com/?apikey=' +
+              encodeURIComponent(env.OMDB_KEY) +
+              '&t=' + encodeURIComponent(name) +
+              (y ? '&y=' + y : '') +
+              '&type=' + type;
+            const r = await fetch(url);
+            const j = await r.json().catch(() => ({}));
+
+            if (j && /limit/i.test(String(j.Error || ''))) {
+              return response({error:'Ліміт запитів OMDb вичерпано'},429);
+            }
+
+            if (j && j.Response === 'True' && j.imdbID) {
+              found = j;
+              break;
+            }
+          }
+          if (found) break;
+        }
+
+        const result = found ? {
+          imdb_id:String(found.imdbID),
+          rating:parseFloat(found.imdbRating) || 0,
+          votes:parseInt(String(found.imdbVotes || '').replace(/[^\d]/g,''),10) || 0
+        } : {imdb_id:'', rating:0, votes:0};
+
+        await env.MZ_SESSIONS.put(
+          cacheKey,
+          JSON.stringify(result),
+          {expirationTtl: found ? 7 * 24 * 3600 : 24 * 3600}
+        );
+
+        return response({status:'ok', ...result});
+      } catch {
+        return response({error:'Помилка запиту до OMDb'},502);
       }
     }
 
