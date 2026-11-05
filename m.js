@@ -242,13 +242,54 @@ function clearTorrserverAuth() {
   notice('TorrServer: збережений логін і пароль очищено');
 }
 function torrAuthHeader() {
-  if (!torrAuth.user) return '';
-  try {return 'Basic ' + btoa(unescape(encodeURIComponent(torrAuth.user + ':' + torrAuth.pass)));}
+  var user = torrAuth.user, pass = torrAuth.pass;
+  if (!user) {
+    try {
+      if (window.Lampa && Lampa.Storage && Lampa.Storage.field('torrserver_auth')) {
+        user = String(Lampa.Storage.get('torrserver_login') || '');
+        pass = String(Lampa.Storage.get('torrserver_password') || '');
+      }
+    } catch(e) {}
+  }
+  if (!user) return '';
+  try {return 'Basic ' + btoa(unescape(encodeURIComponent(user + ':' + pass)));}
   catch(e) {return '';}
 }
 function setTorrAuthorization(xhr) {
   var auth = torrAuthHeader();
   if (auth) xhr.setRequestHeader('Authorization',auth);
+}
+function torrClean(v) {
+  v = String(v || '').trim().replace(/\/+$/,'');
+  if (!v) return '';
+  if (!/^https?:\/\//i.test(v)) v = 'http://' + v;
+  return /^https?:\/\/[^\s\/]+$/i.test(v) ? v : '';
+}
+function torrBase() {
+  var v = '';
+  try {v = torrClean(localStorage.getItem('mz_torrserver_url'));} catch(e) {}
+  if (v) return v;
+  try {if (window.Lampa && Lampa.Torserver && Lampa.Torserver.url) v = torrClean(Lampa.Torserver.url());} catch(e) {}
+  if (v) return v;
+  try {
+    if (window.Lampa && Lampa.Storage) v = torrClean(Lampa.Storage.get('torrserver_url') || Lampa.Storage.get('torrserver_url_two'));
+  } catch(e) {}
+  return v;
+}
+function torrReady() {
+  if (torrBase()) return true;
+  notice('TorrServer: адресу не задано. Вкажіть її в налаштуваннях Lampa або в меню Mazepa → Адреса TorrServer');
+  return false;
+}
+function configureTorrserverUrl() {
+  if (!Lampa.Input || !Lampa.Input.edit) {notice('TorrServer: клавіатура недоступна');return;}
+  Lampa.Input.edit({value:torrBase(),free:true},function(value) {
+    if (!String(value || '').trim()) return;
+    var v = torrClean(value);
+    if (!v) {notice('TorrServer: некоректна адреса (приклад: 192.168.0.110:8090)');return;}
+    try {localStorage.setItem('mz_torrserver_url',v);notice('TorrServer: адресу збережено: ' + v);}
+    catch(e) {notice('TorrServer: пам’ять недоступна');}
+  });
 }
 function configureTorrserverAuth() {
   if (!Lampa.Input || !Lampa.Input.edit) {
@@ -284,7 +325,7 @@ function startPlaybackMonitor(hash) {
       return;
     }
     var x = new XMLHttpRequest();
-    x.open('POST','http://192.168.0.110:8090/torrents',true);
+    x.open('POST',torrBase()+'/torrents',true);
     x.timeout = 4500;
     x.setRequestHeader('Content-Type','application/json');
     setTorrAuthorization(x);
@@ -348,7 +389,7 @@ function showPreloadFailure(hash, wanted, filled, status) {
       onSelect:function(){},onBack:function(){openMenu();}});
   }
   var x = new XMLHttpRequest();
-  x.open('POST','http://192.168.0.110:8090/settings',true);
+  x.open('POST',torrBase()+'/settings',true);
   x.timeout = 7000;
   x.setRequestHeader('Content-Type','application/json');
   setTorrAuthorization(x);
@@ -372,6 +413,7 @@ function showPreloadFailure(hash, wanted, filled, status) {
   x.send(JSON.stringify({action:'get'}));
 }
 function requestMazepaTorrent(item) {
+  if (!torrReady()) return;
   var token = localStorage.getItem('mz_device_token');
   if (!token) { notice('Mazepa: потрібно прив’язати телевізор'); return; }
   notice('Mazepa: завантаження торрент-файлу...');
@@ -398,7 +440,7 @@ function requestMazepaTorrent(item) {
     form.append('file', new Blob([xhr.response], {type:'application/x-bittorrent'}), 'release.torrent');
     form.append('save', '1');
     var up = new XMLHttpRequest();
-    up.open('POST', 'http://192.168.0.110:8090/torrent/upload', true);
+    up.open('POST', torrBase()+'/torrent/upload', true);
     up.timeout = 60000;
     setTorrAuthorization(up);
     up.onload = function() {
@@ -424,7 +466,7 @@ function requestMazepaTorrent(item) {
               // Do not block launch waiting for /stream?...&preload&stat:
               // the preload request is synchronous and cache fullness is not
               // equivalent to contiguous, playable bytes of the selected file.
-              var url = 'http://192.168.0.110:8090/play/' +
+              var url = torrBase()+'/play/' +
                 encodeURIComponent(status.hash) + '/' + encodeURIComponent(file.id);
               notice('TorrServer: запускаємо відео; перевірка швидкості активна');
               startPlaybackMonitor(status.hash);
@@ -446,7 +488,7 @@ function requestMazepaTorrent(item) {
           function pollTorrent() {
             attempts++;
             var request = new XMLHttpRequest();
-            request.open('POST','http://192.168.0.110:8090/torrents',true);
+            request.open('POST',torrBase()+'/torrents',true);
             request.timeout = 12000;
             request.setRequestHeader('Content-Type','application/json');
             setTorrAuthorization(request);
@@ -539,11 +581,12 @@ function searchMazepaPrompt() {
   });
 }
 function checkPlaybackSpeed() {
+  if (!torrReady()) return;
   var hash = '';
   try {hash = localStorage.getItem('mz_last_torrent_hash') || '';} catch(e) {}
   if (!hash) {notice('TorrServer: спочатку вибери реліз');return;}
   var x = new XMLHttpRequest();
-  x.open('POST','http://192.168.0.110:8090/torrents',true);
+  x.open('POST',torrBase()+'/torrents',true);
   x.timeout = 12000;
   x.setRequestHeader('Content-Type','application/json');
   setTorrAuthorization(x);
@@ -576,7 +619,8 @@ function checkPlaybackSpeed() {
   x.send(JSON.stringify({action:'get',hash:hash}));
 }
 function torrServerDiagnostic() {
-  var base = 'http://192.168.0.110:8090';
+  if (!torrReady()) return;
+  var base = torrBase();
   var checks = [
     {label:'HTTP /echo', method:'GET', path:'/echo'},
     {label:'POST /torrents (list)', method:'POST', path:'/torrents', body:'{"action":"list"}'}
@@ -610,8 +654,8 @@ function openMenu() {
   mzLog('SCREEN','main menu opened');
   Lampa.Select.show({
     title: 'Mazepa',
-    items: [{title:'Пошук торрентів Mazepa', id:'search'},{title:'Повторити останній пошук', id:'search_again'},{title:'Відкритий каталог Mazepa (тест)', id:'catalog'},{title:'Перевірити сесію Mazepa.to', id:'session'},{title:'Діагностика cookies', id:'cookie'},{title:'Тест власної сесії', id:'own'},{title:'Перевірити Cloudflare Worker', id:'worker'},{title:'Перевірити TorrServer', id:'ts_diag'},{title:'Швидкість і буфер відео', id:'ts_speed'},{title:'Журнал зависань відео', id:'ts_journal'},{title:'Зберегти авторизацію TorrServer', id:'ts_auth'},{title:'Очистити авторизацію TorrServer', id:'ts_clear'},{title:'Створити код прив’язки', id:'pair'},{title:'Показати код прив’язки', id:'show_pair'},{title:'Перевірити прив’язку', id:'pair_status'},{title:'Увімкнути діагностику', id:'trace_on'},{title:'Показати журнал', id:'trace_show'},{title:'Вимкнути діагностику', id:'trace_off'}],
-    onSelect: function(item) { mzLog('SELECT', item && item.id ? item.id : 'unknown'); if (item && item.id === 'trace_on') mzEnableTrace(); else if (item && item.id === 'trace_show') mzShowTrace(); else if (item && item.id === 'trace_off') mzDisableTrace(); else if (item && item.id === 'search') searchMazepaPrompt(); else if (item && item.id === 'search_again') searchMazepa(localStorage.getItem('mz_last_query')); else if (item && item.id === 'catalog') publicTrackerPreview(); else if (item && item.id === 'session') sessionCheck(); else if (item && item.id === 'cookie') cookieDiagnostics(); else if (item && item.id === 'own') ownSessionProbe(); else if (item && item.id === 'worker') workerProbe(); else if (item && item.id === 'ts_diag') torrServerDiagnostic(); else if (item && item.id === 'ts_speed') checkPlaybackSpeed(); else if (item && item.id === 'ts_journal') showPlaybackJournal(); else if (item && item.id === 'ts_auth') configureTorrserverAuth(); else if (item && item.id === 'ts_clear') clearTorrserverAuth(); else if (item && item.id === 'pair') pairDevice(); else if (item && item.id === 'show_pair') showSavedPairCode(); else if (item && item.id === 'pair_status') pairStatus(); }
+    items: [{title:'Пошук торрентів Mazepa', id:'search'},{title:'Повторити останній пошук', id:'search_again'},{title:'Відкритий каталог Mazepa (тест)', id:'catalog'},{title:'Перевірити сесію Mazepa.to', id:'session'},{title:'Діагностика cookies', id:'cookie'},{title:'Тест власної сесії', id:'own'},{title:'Перевірити Cloudflare Worker', id:'worker'},{title:'Перевірити TorrServer', id:'ts_diag'},{title:'Швидкість і буфер відео', id:'ts_speed'},{title:'Журнал зависань відео', id:'ts_journal'},{title:'Адреса TorrServer', id:'ts_url'},{title:'Зберегти авторизацію TorrServer', id:'ts_auth'},{title:'Очистити авторизацію TorrServer', id:'ts_clear'},{title:'Створити код прив’язки', id:'pair'},{title:'Показати код прив’язки', id:'show_pair'},{title:'Перевірити прив’язку', id:'pair_status'},{title:'Увімкнути діагностику', id:'trace_on'},{title:'Показати журнал', id:'trace_show'},{title:'Вимкнути діагностику', id:'trace_off'}],
+    onSelect: function(item) { mzLog('SELECT', item && item.id ? item.id : 'unknown'); if (item && item.id === 'trace_on') mzEnableTrace(); else if (item && item.id === 'trace_show') mzShowTrace(); else if (item && item.id === 'trace_off') mzDisableTrace(); else if (item && item.id === 'search') searchMazepaPrompt(); else if (item && item.id === 'search_again') searchMazepa(localStorage.getItem('mz_last_query')); else if (item && item.id === 'catalog') publicTrackerPreview(); else if (item && item.id === 'session') sessionCheck(); else if (item && item.id === 'cookie') cookieDiagnostics(); else if (item && item.id === 'own') ownSessionProbe(); else if (item && item.id === 'worker') workerProbe(); else if (item && item.id === 'ts_diag') torrServerDiagnostic(); else if (item && item.id === 'ts_speed') checkPlaybackSpeed(); else if (item && item.id === 'ts_journal') showPlaybackJournal(); else if (item && item.id === 'ts_url') configureTorrserverUrl(); else if (item && item.id === 'ts_auth') configureTorrserverAuth(); else if (item && item.id === 'ts_clear') clearTorrserverAuth(); else if (item && item.id === 'pair') pairDevice(); else if (item && item.id === 'show_pair') showSavedPairCode(); else if (item && item.id === 'pair_status') pairStatus(); }
   });
 }
 function init() {
