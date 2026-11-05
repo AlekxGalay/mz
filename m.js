@@ -58,6 +58,17 @@ function mzShowTrace() {
 }
 document.addEventListener('keydown', mzKey, true);
 
+var mzShowCount = 0;
+function mzShow(o) {
+  mzShowCount++;
+  var wasOpen = false;
+  try {
+    if (Lampa.Select.opened && Lampa.Select.opened()) {wasOpen = true; Lampa.Select.hide();}
+  } catch(e) {}
+  mzLog('SELECT','show #' + mzShowCount + ' «' + (o && o.title) + '»' + (wasOpen ? ' (попередній закрито, щоб не накопичувати стек)' : ''));
+  Lampa.Select.show(o);
+}
+var mzSearchBusy = false;
 function notice(message) {
   try { if (window.Lampa && Lampa.Noty) Lampa.Noty.show(message); } catch (e) {}
 }
@@ -163,7 +174,7 @@ function showSavedPairCode() {
     notice('Код відсутній або вже недійсний. Створи новий.');
     return;
   }
-  Lampa.Select.show({
+  mzShow({
     title: 'Код прив’язки: ' + code,
     items: [{title:'КОД: ' + code, subtitle:'Запиши код. Дійсний 5 хвилин', id:'code'},{title:'Перевірити прив’язку', id:'check'}],
     onSelect: function(item){mzLog('SELECT','pair screen: ' + (item && item.id)); if(item && item.id === 'check') pairStatus();},
@@ -215,7 +226,7 @@ function publicTrackerPreview() {
         var pageTitle = (doc.title || '').slice(0, 90);
         var body = (doc.body && doc.body.textContent || '').replace(/\\s+/g,' ').trim();
         var pageType = /увійти|пароль|авторизац/i.test(body.slice(0,900)) ? 'можлива сторінка входу' : /cloudflare|checking your browser|access denied/i.test(body.slice(0,900)) ? 'захист сайту' : 'невідомий вміст';
-        Lampa.Select.show({
+        mzShow({
           title:'Mazepa — діагностика каталогу',
           items:[
             {title:'HTTP: ' + x.status},
@@ -230,7 +241,7 @@ function publicTrackerPreview() {
         });
         return;
       }
-      Lampa.Select.show({
+      mzShow({
         title:'Mazepa — відкритий каталог (' + items.length + ')',
         items:items,
         onSelect:function(item){notice(item.title);},
@@ -380,7 +391,7 @@ function showPlaybackJournal() {
     var state = s.stat_string || s.error || (s.http ? 'HTTP '+s.http : '');
     items.push({title:s.time+' | '+speed+' | піри '+peers,subtitle:state});
   });
-  Lampa.Select.show({
+  mzShow({
     title:'Журнал відтворення TorrServer',
     items:items,
     onSelect:function(){},
@@ -398,7 +409,7 @@ function showPreloadFailure(hash, wanted, filled, status) {
     {title:'Ємність preload: '+mib(status.preload_size)+' МБ'}
   ];
   function present() {
-    Lampa.Select.show({title:'TorrServer — чому немає буфера',items:items,
+    mzShow({title:'TorrServer — чому немає буфера',items:items,
       onSelect:function(){},onBack:function(){openMenu();}});
   }
   var x = new XMLHttpRequest();
@@ -487,7 +498,7 @@ function requestMazepaTorrent(item) {
             } catch(e) {notice('Mazepa: помилка відкриття плеєра');}
           };
           if (files.length === 1) play(files[0]);
-          else Lampa.Select.show({
+          else mzShow({
             title:'Вибір відеофайлу',
             items:files.map(function(f,i){return {title:f.path,id:String(i)};}),
             onSelect:function(selected){if(selected)play(files[Number(selected.id)]);},
@@ -545,6 +556,8 @@ function searchMazepa(query, opts) {
   if (!query) {notice('Mazepa: введи назву фільму або серіалу'); return;}
   var token = localStorage.getItem('mz_device_token');
   if (!token) {notice('Mazepa: спочатку прив’яжи телевізор'); return;}
+  if (mzSearchBusy) {notice('Mazepa: пошук уже виконується, зачекайте');return;}
+  mzSearchBusy = true;
   localStorage.setItem('mz_last_query', query);
   notice('Mazepa: шукаємо «' + query + '»...');
   var x = new XMLHttpRequest();
@@ -553,6 +566,7 @@ function searchMazepa(query, opts) {
   x.setRequestHeader('Content-Type', 'application/json');
   x.setRequestHeader('Authorization', 'Bearer ' + token);
   x.onload = function() {
+    mzSearchBusy = false;
     var data;
     try {data = JSON.parse(x.responseText || '{}');}
     catch(e) {notice('Mazepa: некоректна відповідь Worker');return;}
@@ -573,7 +587,7 @@ function searchMazepa(query, opts) {
     var items = releases.map(function(r, i) {
       return {title:r.title || ('Реліз ' + r.id), subtitle:'Mazepa ID: ' + r.id, id:'item' + i, torrentId:String(r.id)};
     });
-    Lampa.Select.show({
+    mzShow({
       title:'Mazepa: ' + query + ' (' + releases.length + ')',
       items:items,
       onSelect:function(item) {
@@ -582,8 +596,8 @@ function searchMazepa(query, opts) {
       onBack:function(){mzLog('BACK','results list; fromCard=' + !!opts.fromCard);if (!opts.fromCard) openMenu();}
     });
   };
-  x.onerror = function(){notice('Mazepa: немає зв’язку з Worker');};
-  x.ontimeout = function(){notice('Mazepa: пошук перевищив 30 секунд');};
+  x.onerror = function(){mzSearchBusy = false;notice('Mazepa: немає зв’язку з Worker');};
+  x.ontimeout = function(){mzSearchBusy = false;notice('Mazepa: пошук перевищив 30 секунд');};
   x.send(JSON.stringify({query:query}));
 }
 function searchMazepaPrompt() {
@@ -625,7 +639,7 @@ function checkPlaybackSpeed() {
         {title:'Стан: ' + (st.stat_string || 'невідомо')},
         {title:'Оновити показники',id:'refresh'}
       ];
-      Lampa.Select.show({
+      mzShow({
         title:'TorrServer — стан відтворення',
         items:items,
         onSelect:function(item){if(item && item.id === 'refresh')checkPlaybackSpeed();},
@@ -647,7 +661,7 @@ function torrServerDiagnostic() {
   var output = [];
   function next(i) {
     if (i >= checks.length) {
-      Lampa.Select.show({
+      mzShow({
         title:'TorrServer — перевірка доступу',
         items:output.map(function(t,j){return {title:t,id:String(j)};}),
         onSelect:function(){},
@@ -671,12 +685,13 @@ function torrServerDiagnostic() {
 }
 function openMenu() {
   mzLog('SCREEN','main menu opened (openMenu викликано)');
-  Lampa.Select.show({
+  mzShow({
     title: 'Mazepa',
     items: [{title:'Пошук торрентів Mazepa', id:'search'},{title:'Повторити останній пошук', id:'search_again'},{title:'Відкритий каталог Mazepa (тест)', id:'catalog'},{title:'Перевірити сесію Mazepa.to', id:'session'},{title:'Діагностика cookies', id:'cookie'},{title:'Тест власної сесії', id:'own'},{title:'Перевірити Cloudflare Worker', id:'worker'},{title:'Перевірити TorrServer', id:'ts_diag'},{title:'Швидкість і буфер відео', id:'ts_speed'},{title:'Журнал зависань відео', id:'ts_journal'},{title:'Адреса TorrServer', id:'ts_url'},{title:'Зберегти авторизацію TorrServer', id:'ts_auth'},{title:'Очистити авторизацію TorrServer', id:'ts_clear'},{title:'Створити код прив’язки', id:'pair'},{title:'Показати код прив’язки', id:'show_pair'},{title:'Перевірити прив’язку', id:'pair_status'},{title:'Увімкнути діагностику', id:'trace_on'},{title:'Показати журнал', id:'trace_show'},{title:'Вимкнути діагностику', id:'trace_off'}],
     onSelect: function(item) { mzLog('SELECT', item && item.id ? item.id : 'unknown'); if (item && item.id === 'trace_on') mzEnableTrace(); else if (item && item.id === 'trace_show') mzShowTrace(); else if (item && item.id === 'trace_off') mzDisableTrace(); else if (item && item.id === 'search') searchMazepaPrompt(); else if (item && item.id === 'search_again') searchMazepa(localStorage.getItem('mz_last_query')); else if (item && item.id === 'catalog') publicTrackerPreview(); else if (item && item.id === 'session') sessionCheck(); else if (item && item.id === 'cookie') cookieDiagnostics(); else if (item && item.id === 'own') ownSessionProbe(); else if (item && item.id === 'worker') workerProbe(); else if (item && item.id === 'ts_diag') torrServerDiagnostic(); else if (item && item.id === 'ts_speed') checkPlaybackSpeed(); else if (item && item.id === 'ts_journal') showPlaybackJournal(); else if (item && item.id === 'ts_url') configureTorrserverUrl(); else if (item && item.id === 'ts_auth') configureTorrserverAuth(); else if (item && item.id === 'ts_clear') clearTorrserverAuth(); else if (item && item.id === 'pair') pairDevice(); else if (item && item.id === 'show_pair') showSavedPairCode(); else if (item && item.id === 'pair_status') pairStatus(); }
   });
 }
+var mzLastCardTap = 0;
 function addCardButton(e) {
   if (!e || e.type !== 'complite' || !window.$) return;
   var movie = (e.data && e.data.movie) || {};
@@ -691,6 +706,9 @@ function addCardButton(e) {
   if (!holder.length) {mzLog('CARD','контейнер кнопок не знайдено'); return;}
   var btn = $('<div class="full-start__button selector button--mazepa"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><span>Mazepa</span></div>');
   btn.on('hover:enter', function() {
+    var nowTap = Date.now();
+    if (nowTap - mzLastCardTap < 1500) {mzLog('CARD','повторне натискання проігноровано');return;}
+    mzLastCardTap = nowTap;
     mzLog('CARD','search ' + (title || alt));
     searchMazepa(title || alt, {alt:alt, fromCard:true});
   });
