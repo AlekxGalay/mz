@@ -24,7 +24,8 @@ plugin for lampa
 - Адреса TorrServer: `mz_torrserver_url` (меню Mazepa → Адреса TorrServer) → `Lampa.Torserver.url()` → `Lampa.Storage` (`torrserver_url`/`_two`) → якщо порожньо, `torrReady()` повідомляє користувача. Дефолтної адреси немає
 - Авторизація TorrServer: власні `mz_torrserver_auth`, інакше логін/пароль з налаштувань Lampa (`torrserver_auth`, `torrserver_login`, `torrserver_password`)
 - Код лишається ES5 (без let/const/arrow/template), бо на старих ТВ (webOS/Tizen) новий синтаксис може не працювати
-- Ключі Lampa взято з вихідного коду lampa-source (`src/interaction/torserver.js`, `src/utils/reguest.js`); на реальних ТВ ще не перевірено
+- Ключі Lampa взято з вихідного коду lampa-source (`src/interaction/torserver.js`, `src/utils/reguest.js`)
+- Перевірено на LG webOS 24 (коміт 975a722): адреса введена вручну через меню, фільм запустився і працює. Автопідхоплення адреси з налаштувань Lampa на реальному ТВ не перевірено (адресу вводили вручну); на інших ТВ не перевірено
 
 ## Worker (`worker/`, вивантажено з Cloudflare через `wrangler init --from-dash mz-api`)
 
