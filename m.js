@@ -727,8 +727,9 @@ function mzMaxSizeGb() {
   } catch(e) {}
   return v;
 }
+// за замовчуванням ВИМКНЕНО: майже всі розділи Mazepa й так українською, а фільтр за назвою може хибно ховати добре
 function mzOnlyUa() {
-  try {return localStorage.getItem('mz_only_ua') !== '0';} catch(e) {return true;}
+  try {return localStorage.getItem('mz_only_ua') === '1';} catch(e) {return false;}
 }
 // true — за замовчуванням «авто» (найвищий наявний рівень), false — «усі рівні»
 function mzBestOnly() {
