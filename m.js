@@ -333,6 +333,44 @@ function showPlaybackJournal() {
     onBack:function(){openMenu();}
   });
 }
+function showPreloadFailure(hash, wanted, filled, status) {
+  var mib = function(n){return (Number(n || 0)/1048576).toFixed(1);};
+  var items = [
+    {title:'Буфер: '+mib(filled)+' / '+mib(wanted)+' МБ'},
+    {title:'Стан торрента: '+(status.stat_string || 'невідомий')},
+    {title:'Активні піри: '+Number(status.active_peers || 0)},
+    {title:'Підключені сідери: '+Number(status.connected_seeders || 0)},
+    {title:'Швидкість: '+mib(status.download_speed)+' МБ/с'},
+    {title:'Ємність preload: '+mib(status.preload_size)+' МБ'}
+  ];
+  function present() {
+    Lampa.Select.show({title:'TorrServer — чому немає буфера',items:items,
+      onSelect:function(){},onBack:function(){openMenu();}});
+  }
+  var x = new XMLHttpRequest();
+  x.open('POST','http://192.168.0.110:8090/settings',true);
+  x.timeout = 7000;
+  x.setRequestHeader('Content-Type','application/json');
+  setTorrAuthorization(x);
+  x.onload = function() {
+    if (x.status === 200) {
+      try {
+        var settings = JSON.parse(x.responseText || '{}');
+        var cache = Number(settings.CacheSize || 0);
+        var percent = Number(settings.PreloadCache || 0);
+        items.push({title:'Налаштований кеш: '+mib(cache)+' МБ'});
+        items.push({title:'PreloadCache: '+percent+'%'});
+        if (!cache || !percent) items.push({title:'Причина: кеш або preload вимкнено'});
+        else if ((status.stat_string || '') === 'Torrent in db') items.push({title:'Торрент відключився; перевір таймаут'});
+        else if (!Number(status.active_peers || 0)) items.push({title:'Немає активних пірів для завантаження'});
+      } catch(e) {items.push({title:'Налаштування: не вдалося прочитати JSON'});}
+    } else items.push({title:'Налаштування кешу: HTTP '+x.status});
+    present();
+  };
+  x.onerror = function(){items.push({title:'Налаштування кешу: немає зв’язку'});present();};
+  x.ontimeout = function(){items.push({title:'Налаштування кешу: таймаут'});present();};
+  x.send(JSON.stringify({action:'get'}));
+}
 function requestMazepaTorrent(item) {
   var token = localStorage.getItem('mz_device_token');
   if (!token) { notice('Mazepa: потрібно прив’язати телевізор'); return; }
@@ -430,7 +468,7 @@ function requestMazepaTorrent(item) {
                       var filled = Number(next.preloaded_bytes || 0);
                       if (filled >= wanted) {launch(filled);return;}
                       if (checks >= 15 || next.stat_string === 'Torrent in db') {
-                        notice('TorrServer: буфер '+mib(filled)+' / '+mib(wanted)+' МБ; стан: '+(next.stat_string || 'невідомий')+'. Перевір піри та кеш');
+                        showPreloadFailure(status.hash,wanted,filled,next);
                         return;
                       }
                       setTimeout(poll,2000);
