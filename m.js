@@ -526,7 +526,8 @@ function requestMazepaTorrent(item) {
   xhr.ontimeout = function() { notice('Mazepa: таймаут завантаження'); };
   xhr.send(JSON.stringify({id: item.torrentId}));
 }
-function searchMazepa(query) {
+function searchMazepa(query, opts) {
+  opts = opts || {};
   query = String(query || '').trim();
   if (!query) {notice('Mazepa: введи назву фільму або серіалу'); return;}
   var token = localStorage.getItem('mz_device_token');
@@ -548,6 +549,11 @@ function searchMazepa(query) {
     }
     var releases = Array.isArray(data.results) ? data.results : [];
     if (!releases.length) {
+      if (opts.alt && opts.alt !== query) {
+        notice('Mazepa: за «' + query + '» нічого, пробуємо «' + opts.alt + '»...');
+        searchMazepa(opts.alt, {fromCard:opts.fromCard});
+        return;
+      }
       notice('Mazepa: за запитом «' + query + '» нічого не знайдено (' + (data.html_size || 0) + ' символів HTML)');
       return;
     }
@@ -560,7 +566,7 @@ function searchMazepa(query) {
       onSelect:function(item) {
         if (item) requestMazepaTorrent(item);
       },
-      onBack:function(){openMenu();}
+      onBack:function(){if (!opts.fromCard) openMenu();}
     });
   };
   x.onerror = function(){notice('Mazepa: немає зв’язку з Worker');};
@@ -658,6 +664,27 @@ function openMenu() {
     onSelect: function(item) { mzLog('SELECT', item && item.id ? item.id : 'unknown'); if (item && item.id === 'trace_on') mzEnableTrace(); else if (item && item.id === 'trace_show') mzShowTrace(); else if (item && item.id === 'trace_off') mzDisableTrace(); else if (item && item.id === 'search') searchMazepaPrompt(); else if (item && item.id === 'search_again') searchMazepa(localStorage.getItem('mz_last_query')); else if (item && item.id === 'catalog') publicTrackerPreview(); else if (item && item.id === 'session') sessionCheck(); else if (item && item.id === 'cookie') cookieDiagnostics(); else if (item && item.id === 'own') ownSessionProbe(); else if (item && item.id === 'worker') workerProbe(); else if (item && item.id === 'ts_diag') torrServerDiagnostic(); else if (item && item.id === 'ts_speed') checkPlaybackSpeed(); else if (item && item.id === 'ts_journal') showPlaybackJournal(); else if (item && item.id === 'ts_url') configureTorrserverUrl(); else if (item && item.id === 'ts_auth') configureTorrserverAuth(); else if (item && item.id === 'ts_clear') clearTorrserverAuth(); else if (item && item.id === 'pair') pairDevice(); else if (item && item.id === 'show_pair') showSavedPairCode(); else if (item && item.id === 'pair_status') pairStatus(); }
   });
 }
+function addCardButton(e) {
+  if (!e || e.type !== 'complite' || !window.$) return;
+  var movie = (e.data && e.data.movie) || {};
+  var title = String(movie.title || movie.name || '').trim();
+  var alt = String(movie.original_title || movie.original_name || '').trim();
+  if (!title && !alt) return;
+  var root;
+  try {root = e.object.activity.render();} catch(err) {root = e.body;}
+  if (!root || !root.find) return;
+  if (root.find('.button--mazepa').length) return;
+  var holder = root.find('.full-start-new__buttons, .full-start__buttons').first();
+  if (!holder.length) {mzLog('CARD','контейнер кнопок не знайдено'); return;}
+  var btn = $('<div class="full-start__button selector button--mazepa"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><span>Mazepa</span></div>');
+  btn.on('hover:enter', function() {
+    mzLog('CARD','search ' + (title || alt));
+    searchMazepa(title || alt, {alt:alt, fromCard:true});
+  });
+  var play = holder.find('.button--play');
+  if (play.length) play.after(btn); else holder.prepend(btn);
+  mzLog('CARD','button added');
+}
 function init() {
   if (!window.Lampa || !Lampa.SettingsApi) return;
   Lampa.SettingsApi.addComponent({
@@ -670,6 +697,7 @@ function init() {
     field:{name:'Відкрити Mazepa',description:'Автономний плагін без MacBook'},
     onChange:openMenu
   });
+  try {Lampa.Listener.follow('full', addCardButton);} catch(err) {mzLog('CARD','listener error');}
   notice('Mazepa: плагін завантажено');
 }
 if (window.appready) init();
