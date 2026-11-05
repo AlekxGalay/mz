@@ -712,8 +712,8 @@ function openMenu() {
   mzLog('SCREEN','main menu opened (openMenu викликано)');
   mzShow({
     title: 'Mazepa',
-    items: [{title:'Пошук торрентів Mazepa', id:'search'},{title:'Повторити останній пошук', id:'search_again'},{title:'Відкритий каталог Mazepa (тест)', id:'catalog'},{title:'Перевірити сесію Mazepa.to', id:'session'},{title:'Діагностика cookies', id:'cookie'},{title:'Тест власної сесії', id:'own'},{title:'Перевірити Cloudflare Worker', id:'worker'},{title:'Перевірити TorrServer', id:'ts_diag'},{title:'Швидкість і буфер відео', id:'ts_speed'},{title:'Журнал зависань відео', id:'ts_journal'},{title:'Рівень 0 — понад ' + (mzMaxSizeGb() > 0 ? mzMaxSizeGb() + ' ГБ' : '(вимкнено)'), id:'f_size'},{title:'Лише українська озвучка: ' + (mzOnlyUa() ? 'так' : 'ні'), id:'f_ua'},{title:'Рівень за замовчуванням: ' + (mzBestOnly() ? 'авто (найвищий)' : 'усі'), id:'f_best'},{title:'Адреса TorrServer', id:'ts_url'},{title:'Синхронізувати TorrServer з Lampa', id:'ts_sync'},{title:'Зберегти авторизацію TorrServer', id:'ts_auth'},{title:'Очистити авторизацію TorrServer', id:'ts_clear'},{title:'Створити код прив’язки', id:'pair'},{title:'Показати код прив’язки', id:'show_pair'},{title:'Перевірити прив’язку', id:'pair_status'},{title:'Увімкнути діагностику', id:'trace_on'},{title:'Показати журнал', id:'trace_show'},{title:'Вимкнути діагностику', id:'trace_off'}],
-    onSelect: function(item) { mzLog('SELECT', item && item.id ? item.id : 'unknown'); if (item && item.id === 'trace_on') mzEnableTrace(); else if (item && item.id === 'trace_show') mzShowTrace(); else if (item && item.id === 'trace_off') mzDisableTrace(); else if (item && item.id === 'search') searchMazepaPrompt(); else if (item && item.id === 'search_again') searchMazepa(localStorage.getItem('mz_last_query')); else if (item && item.id === 'catalog') publicTrackerPreview(); else if (item && item.id === 'session') sessionCheck(); else if (item && item.id === 'cookie') cookieDiagnostics(); else if (item && item.id === 'own') ownSessionProbe(); else if (item && item.id === 'worker') workerProbe(); else if (item && item.id === 'ts_diag') torrServerDiagnostic(); else if (item && item.id === 'ts_speed') checkPlaybackSpeed(); else if (item && item.id === 'ts_journal') showPlaybackJournal(); else if (item && item.id === 'f_size') mzEditMaxSize(); else if (item && item.id === 'f_ua') mzToggleOnlyUa(); else if (item && item.id === 'f_best') mzToggleBestOnly(); else if (item && item.id === 'ts_url') configureTorrserverUrl(); else if (item && item.id === 'ts_sync') mzSyncLampaTorrserver(); else if (item && item.id === 'ts_auth') configureTorrserverAuth(); else if (item && item.id === 'ts_clear') clearTorrserverAuth(); else if (item && item.id === 'pair') pairDevice(); else if (item && item.id === 'show_pair') showSavedPairCode(); else if (item && item.id === 'pair_status') pairStatus(); }
+    items: [{title:'Пошук торрентів Mazepa', id:'search'},{title:'Повторити останній пошук', id:'search_again'},{title:'Відкритий каталог Mazepa (тест)', id:'catalog'},{title:'Перевірити сесію Mazepa.to', id:'session'},{title:'Діагностика cookies', id:'cookie'},{title:'Тест власної сесії', id:'own'},{title:'Перевірити Cloudflare Worker', id:'worker'},{title:'Перевірити TorrServer', id:'ts_diag'},{title:'Швидкість і буфер відео', id:'ts_speed'},{title:'Журнал зависань відео', id:'ts_journal'},{title:'Рівень 0 — понад ' + (mzMaxSizeGb() > 0 ? mzMaxSizeGb() + ' ГБ' : '(вимкнено)'), id:'f_size'},{title:'Лише українська озвучка: ' + (mzOnlyUa() ? 'так' : 'ні'), id:'f_ua'},{title:'Рівень за замовчуванням: ' + (mzBestOnly() ? 'авто (найвищий)' : 'усі'), id:'f_best'},{title:'Оновити рядки на головній', id:'rows_reset'},{title:'Адреса TorrServer', id:'ts_url'},{title:'Синхронізувати TorrServer з Lampa', id:'ts_sync'},{title:'Зберегти авторизацію TorrServer', id:'ts_auth'},{title:'Очистити авторизацію TorrServer', id:'ts_clear'},{title:'Створити код прив’язки', id:'pair'},{title:'Показати код прив’язки', id:'show_pair'},{title:'Перевірити прив’язку', id:'pair_status'},{title:'Увімкнути діагностику', id:'trace_on'},{title:'Показати журнал', id:'trace_show'},{title:'Вимкнути діагностику', id:'trace_off'}],
+    onSelect: function(item) { mzLog('SELECT', item && item.id ? item.id : 'unknown'); if (item && item.id === 'trace_on') mzEnableTrace(); else if (item && item.id === 'trace_show') mzShowTrace(); else if (item && item.id === 'trace_off') mzDisableTrace(); else if (item && item.id === 'search') searchMazepaPrompt(); else if (item && item.id === 'search_again') searchMazepa(localStorage.getItem('mz_last_query')); else if (item && item.id === 'catalog') publicTrackerPreview(); else if (item && item.id === 'session') sessionCheck(); else if (item && item.id === 'cookie') cookieDiagnostics(); else if (item && item.id === 'own') ownSessionProbe(); else if (item && item.id === 'worker') workerProbe(); else if (item && item.id === 'ts_diag') torrServerDiagnostic(); else if (item && item.id === 'ts_speed') checkPlaybackSpeed(); else if (item && item.id === 'ts_journal') showPlaybackJournal(); else if (item && item.id === 'f_size') mzEditMaxSize(); else if (item && item.id === 'f_ua') mzToggleOnlyUa(); else if (item && item.id === 'f_best') mzToggleBestOnly(); else if (item && item.id === 'rows_reset') mzResetRows(); else if (item && item.id === 'ts_url') configureTorrserverUrl(); else if (item && item.id === 'ts_sync') mzSyncLampaTorrserver(); else if (item && item.id === 'ts_auth') configureTorrserverAuth(); else if (item && item.id === 'ts_clear') clearTorrserverAuth(); else if (item && item.id === 'pair') pairDevice(); else if (item && item.id === 'show_pair') showSavedPairCode(); else if (item && item.id === 'pair_status') pairStatus(); }
   });
 }
 // ===== Рівні якості й фільтри =====
@@ -1048,6 +1048,278 @@ function mzOpenNativeList(movie, title, alt) {
     mz_only: true
   });
 }
+// ===== Рядки на головній Lampa: «Новинки Mazepa» і «Популярне на Mazepa (IMDb)» =====
+var mzRowTimeout = 6000;           // головна чекає на рядки, тому довго не тримаємо
+var MZ_ROW_LIMIT = 20;
+var MZ_ROW_TTL = {'new': 30 * 60 * 1000, top: 6 * 3600 * 1000};
+var MZ_MIN_VOTES = 1000;           // відсікає невідомі фільми з єдиним голосом
+var mzRowBusy = {};
+
+function mzParseRelease(title) {
+  var raw = String(title || '');
+  var series = /сезон|сер[іиї]|season|(?:^|[^a-z])S\d{1,2}(?:E\d+)?(?![a-z0-9])|епізод|episodes?/i.test(raw);
+  var year = '';
+  var y1 = raw.match(/\(((?:19|20)\d{2})\)/);
+  var y2 = raw.match(/(?:^|[\s\[,])((?:19|20)\d{2})(?=[\s\],)]|$)/);
+  if (y1) year = y1[1]; else if (y2) year = y2[1];
+  var head = raw.replace(/\[[^\]]*\]/g, ' ').split(/\s*[\(\|]\s*/)[0].replace(/\s+/g, ' ').trim();
+  if (!head) return null;
+  var parts = head.split(/\s+\/\s+/).map(function(p) {return p.trim();}).filter(Boolean);
+  var name = parts[0] || '';
+  var original = '';
+  for (var i = 0; i < parts.length; i++) {
+    if (/[A-Za-z]/.test(parts[i]) && !/[А-Яа-яІіЇїЄєҐґ]/.test(parts[i])) {original = parts[i]; break;}
+  }
+  if (!original && parts[1]) original = parts[1];
+  if (name.length < 2 && original.length < 2) return null;
+  return {title: name, original: original, year: year, series: series};
+}
+function mzRelKey(r) {
+  return (String(r.original || r.title).toLowerCase() + '|' + r.year + '|' + (r.series ? 's' : 'm'));
+}
+function mzJsonGet(key) {
+  try {return JSON.parse(localStorage.getItem(key) || 'null');} catch(e) {return null;}
+}
+function mzJsonSet(key, value) {
+  try {localStorage.setItem(key, JSON.stringify(value)); return true;} catch(e) {return false;}
+}
+function mzTmdb(path, done) {
+  try {
+    var net = new Lampa.Reguest();
+    net.timeout(8000);
+    var lang = (Lampa.Storage && Lampa.Storage.field('tmdb_lang')) || 'uk';
+    var url = Lampa.TMDB.api(path + (path.indexOf('?') >= 0 ? '&' : '?') + 'api_key=' + Lampa.TMDB.key() + '&language=' + lang);
+    net.silent(url, function(json) {done(null, json);}, function() {done('tmdb');});
+  } catch(e) {done(String(e));}
+}
+// Мінімальна картка для кешу (щоб localStorage не розпухав)
+function mzSlimCard(c) {
+  var keep = ['id','title','name','original_title','original_name','poster_path','backdrop_path','release_date',
+    'first_air_date','vote_average','vote_count','genre_ids','media_type','original_language','source'];
+  var o = {};
+  keep.forEach(function(k) {if (c[k] !== undefined) o[k] = c[k];});
+  if (c.overview) o.overview = String(c.overview).slice(0, 300);
+  return o;
+}
+function mzCardCacheGet(key) {
+  var all = mzJsonGet('mz_card_cache') || {};
+  return all[key] || null;
+}
+function mzCardCachePut(key, card) {
+  var all = mzJsonGet('mz_card_cache') || {};
+  all[key] = mzSlimCard(card);
+  var keys = Object.keys(all);
+  if (keys.length > 300) keys.slice(0, keys.length - 300).forEach(function(k) {delete all[k];});
+  mzJsonSet('mz_card_cache', all);
+}
+function mzFinishCard(c, rel) {
+  c.source = 'tmdb';
+  if (!c.media_type) c.media_type = rel && rel.series ? 'tv' : 'movie';
+  return c;
+}
+// пошук картки TMDB за назвою і роком (для рядка «Новинки», без OMDb)
+function mzResolveBySearch(rel, done) {
+  var key = 's:' + mzRelKey(rel);
+  var hit = mzCardCacheGet(key);
+  if (hit) {done(mzFinishCard(hit, rel)); return;}
+  var type = rel.series ? 'tv' : 'movie';
+  var yearParam = rel.year ? '&' + (rel.series ? 'first_air_date_year' : 'year') + '=' + rel.year : '';
+  var queries = [];
+  if (rel.original) queries.push(rel.original);
+  if (rel.title && rel.title !== rel.original) queries.push(rel.title);
+  var idx = 0;
+  function next() {
+    if (idx >= queries.length) {done(null); return;}
+    var q = queries[idx++];
+    mzTmdb('search/' + type + '?query=' + encodeURIComponent(q) + yearParam, function(err, json) {
+      var r = !err && json && json.results && json.results[0];
+      if (!r || !r.poster_path) {next(); return;}
+      mzCardCachePut(key, r);
+      done(mzFinishCard(r, rel));
+    });
+  }
+  next();
+}
+// картка TMDB за IMDb-ідентифікатором (точний збіг, для «Популярного»)
+function mzResolveByImdb(imdbId, rel, done) {
+  var key = 'i:' + imdbId;
+  var hit = mzCardCacheGet(key);
+  if (hit) {done(mzFinishCard(hit, rel)); return;}
+  mzTmdb('find/' + imdbId + '?external_source=imdb_id', function(err, json) {
+    var r = !err && json && ((rel.series ? (json.tv_results || []) : (json.movie_results || []))[0] ||
+      (json.movie_results || [])[0] || (json.tv_results || [])[0]);
+    if (!r) {done(null); return;}
+    if (!r.media_type) r.media_type = (json.tv_results || []).indexOf(r) >= 0 ? 'tv' : 'movie';
+    mzCardCachePut(key, r);
+    done(mzFinishCard(r, rel));
+  });
+}
+function mzWorkerPost(path, payload, done) {
+  var token = localStorage.getItem('mz_device_token');
+  if (!token) {done('not-paired'); return;}
+  var x = new XMLHttpRequest();
+  x.open('POST', API + path, true);
+  x.timeout = 25000;
+  x.setRequestHeader('Content-Type', 'application/json');
+  x.setRequestHeader('Authorization', 'Bearer ' + token);
+  x.onload = function() {
+    var data = null;
+    try {data = JSON.parse(x.responseText || '{}');} catch(e) {}
+    if (x.status !== 200 || !data || data.error) {done((data && data.error) || ('HTTP ' + x.status), null, x.status); return;}
+    done(null, data);
+  };
+  x.onerror = function() {done('network');};
+  x.ontimeout = function() {done('timeout');};
+  x.send(JSON.stringify(payload));
+}
+// проганяє worker(item, cb) по items із обмеженою паралельністю
+function mzEachLimit(items, limit, worker, done) {
+  var i = 0, active = 0, finished = 0, total = items.length;
+  if (!total) {done(); return;}
+  function pump() {
+    while (active < limit && i < total) {
+      (function(item) {
+        active++;
+        worker(item, function() {active--; finished++; if (finished === total) done(); else pump();});
+      })(items[i++]);
+    }
+  }
+  pump();
+}
+function mzUniqueReleases(results) {
+  var seen = {}, out = [];
+  (results || []).forEach(function(r) {
+    var rel = mzParseRelease(r.title);
+    if (!rel) return;
+    var k = mzRelKey(rel);
+    if (seen[k]) return;
+    seen[k] = true;
+    out.push(rel);
+  });
+  return out;
+}
+function mzBuildNew(done) {
+  mzWorkerPost('/mazepa/feed', {kind: 'new', limit: 30}, function(err, data) {
+    if (err) {mzLog('ROW','новинки: ' + err); done([], err); return;}
+    var rels = mzUniqueReleases(data.results);
+    var cards = new Array(rels.length);
+    mzEachLimit(rels.map(function(r, i) {return {r: r, i: i};}), 4, function(it, cb) {
+      mzResolveBySearch(it.r, function(card) {cards[it.i] = card; cb();});
+    }, function() {
+      var seen = {}, out = [];
+      cards.forEach(function(c) {
+        if (c && !seen[c.id]) {seen[c.id] = true; out.push(c);}
+      });
+      mzLog('ROW','новинки: релізів ' + rels.length + ', карток ' + out.length);
+      done(out.slice(0, MZ_ROW_LIMIT));
+    });
+  });
+}
+function mzBuildTop(done) {
+  mzWorkerPost('/mazepa/feed', {kind: 'top', limit: 50}, function(err, data) {
+    if (err) {mzLog('ROW','популярне: ' + err); done([], err); return;}
+    var rels = mzUniqueReleases(data.results);
+    var stop = '';
+    mzEachLimit(rels, 4, function(rel, cb) {
+      if (stop) {cb(); return;}
+      mzWorkerPost('/imdb', {title: rel.title, original: rel.original, year: rel.year, series: rel.series}, function(e, d, status) {
+        if (e) {if (status === 503 || status === 429 || e === 'not-paired') stop = e; cb(); return;}
+        rel.imdb = d.imdb_id; rel.rating = d.rating; rel.votes = d.votes;
+        cb();
+      });
+    }, function() {
+      if (stop) {mzLog('ROW','популярне: зупинено — ' + stop); done([], stop); return;}
+      var ranked = rels.filter(function(r) {return r.imdb && r.rating > 0 && r.votes >= MZ_MIN_VOTES;});
+      var seenIds = {};
+      ranked = ranked.filter(function(r) {if (seenIds[r.imdb]) return false; seenIds[r.imdb] = true; return true;});
+      ranked.sort(function(a, b) {return b.rating - a.rating || b.votes - a.votes;});
+      ranked = ranked.slice(0, MZ_ROW_LIMIT);
+      var cards = new Array(ranked.length);
+      mzEachLimit(ranked.map(function(r, i) {return {r: r, i: i};}), 4, function(it, cb) {
+        mzResolveByImdb(it.r.imdb, it.r, function(card) {
+          if (card) {
+            card = JSON.parse(JSON.stringify(card));
+            card.imdb_rating = it.r.rating;
+            card.vote_average = it.r.rating;
+          }
+          cards[it.i] = card; cb();
+        });
+      }, function() {
+        var out = cards.filter(Boolean);
+        mzLog('ROW','популярне: оцінених ' + ranked.length + ', карток ' + out.length);
+        done(out);
+      });
+    });
+  });
+}
+function mzRowCacheGet(kind) {
+  var c = mzJsonGet('mz_row_' + kind);
+  if (!c || !c.t || !Array.isArray(c.cards)) return null;
+  return {cards: c.cards, fresh: (Date.now() - c.t) < (c.ttl || MZ_ROW_TTL[kind]), err: c.err || ''};
+}
+function mzRowCachePut(kind, cards, err) {
+  // помилки кешуємо коротко: відсутній ключ/ліміт OMDb — 1 год, мережа та інше — 5 хв
+  var ttl = err ? (/OMDb|ліміт/i.test(String(err)) ? 3600000 : 300000) : MZ_ROW_TTL[kind];
+  mzJsonSet('mz_row_' + kind, {t: Date.now(), ttl: ttl, cards: cards.map(mzSlimCardKeepRating), err: err || ''});
+}
+function mzSlimCardKeepRating(c) {
+  var o = mzSlimCard(c);
+  if (c.imdb_rating !== undefined) o.imdb_rating = c.imdb_rating;
+  return o;
+}
+function mzRowRefresh(kind, done) {
+  if (mzRowBusy[kind]) {done(null); return;}
+  mzRowBusy[kind] = true;
+  (kind === 'top' ? mzBuildTop : mzBuildNew)(function(cards, err) {
+    mzRowBusy[kind] = false;
+    // помилку (напр. немає ключа OMDb) теж запам'ятовуємо на TTL, щоб не штурмувати сервер при кожному відкритті
+    mzRowCachePut(kind, cards, err);
+    done(cards);
+  });
+}
+function mzRowDefinition(kind, title, index) {
+  return {
+    name: 'mazepa_' + kind,
+    title: title,
+    index: index,
+    screen: ['main'],
+    call: function() {
+      if (!localStorage.getItem('mz_device_token')) return;
+      return function(callback) {
+        var cached = mzRowCacheGet(kind);
+        function send(cards) {callback(cards && cards.length ? {results: cards, title: title} : {});}
+        if (cached) {
+          send(cached.cards);                                    // миттєво з кешу
+          if (!cached.fresh) mzRowRefresh(kind, function() {});  // старий кеш оновлюємо у фоні
+          return;
+        }
+        var answered = false;
+        var timer = setTimeout(function() {
+          if (!answered) {answered = true; mzLog('ROW', kind + ': таймаут ' + mzRowTimeout + ' мс, рядок з’явиться при наступному відкритті'); callback({});}
+        }, mzRowTimeout);
+        mzRowRefresh(kind, function(cards) {
+          if (answered || cards === null) return;
+          answered = true; clearTimeout(timer); send(cards);
+        });
+      };
+    }
+  };
+}
+var mzRowsAdded = false;
+function mzAddRows() {
+  if (mzRowsAdded || !window.Lampa || !Lampa.ContentRows || !Lampa.ContentRows.add) return;
+  try {
+    Lampa.ContentRows.add(mzRowDefinition('new', 'Новинки Mazepa', 0));
+    Lampa.ContentRows.add(mzRowDefinition('top', 'Популярне на Mazepa (IMDb)', 1));
+    mzRowsAdded = true;
+    mzLog('ROW','рядки на головній додано');
+  } catch(e) {mzLog('ROW','не вдалося додати рядки: ' + e);}
+}
+function mzResetRows() {
+  ['mz_row_new', 'mz_row_top'].forEach(function(k) {try {localStorage.removeItem(k);} catch(e) {}});
+  notice('Mazepa: кеш рядків очищено, відкрийте головну заново');
+}
+
 var mzLastCardTap = 0;
 function addCardButton(e) {
   if (!e || e.type !== 'complite' || !window.$) return;
@@ -1089,6 +1361,7 @@ function init() {
     onChange:openMenu
   });
   mzInstallHooks();
+  mzAddRows();
   try {Lampa.Listener.follow('full', addCardButton);} catch(err) {mzLog('CARD','listener error');}
   notice('Mazepa: плагін завантажено');
 }
