@@ -1349,6 +1349,63 @@ function mzResetRows() {
   mzPrewarmRows();
 }
 
+// ===== Діагностика позиції перегляду (лише в журналі, коли діагностика ввімкнена) =====
+var mzPlayerDiagOn = false;
+function mzStorageKb() {
+  try {
+    var n = 0;
+    for (var i = 0; i < localStorage.length; i++) {var k = localStorage.key(i); n += k.length + (localStorage.getItem(k) || '').length;}
+    return Math.round(n * 2 / 1024);
+  } catch(e) {return -1;}
+}
+function mzFileViewRecord(hash) {
+  try {
+    for (var i = 0; i < localStorage.length; i++) {
+      var k = localStorage.key(i);
+      if (k.indexOf('file_view') !== 0) continue;
+      var all = JSON.parse(localStorage.getItem(k) || '{}');
+      if (all && hash && all[hash]) return k + ': ' + JSON.stringify(all[hash]);
+    }
+  } catch(e) {return 'помилка читання: ' + e;}
+  return 'запису для hash немає';
+}
+function mzInstallPlayerDiag() {
+  if (mzPlayerDiagOn || !window.Lampa || !Lampa.Player || !Lampa.Player.listener) return;
+  try {
+    var cur = null, ticks = 0, lastLog = 0;
+    function tlText(tl) {
+      if (!tl) return 'timeline ВІДСУТНІЙ';
+      return 'timeline hash=' + tl.hash + ', time=' + tl.time + ', percent=' + tl.percent + ', duration=' + tl.duration +
+        ', stop_recording=' + !!tl.stop_recording + ', handler=' + (typeof tl.handler);
+    }
+    Lampa.Player.listener.follow('start', function(d) {
+      cur = d || null; ticks = 0; lastLog = 0;
+      var tf = '', pt = '';
+      try {tf = Lampa.Storage.field('torrserver_tracktimecode'); pt = Lampa.Storage.field('player_timecode');} catch(e) {}
+      mzLog('PLAYER','start «' + (d && d.title) + '»: ' + tlText(d && d.timeline) + '; player_timecode=' + pt + '; torrserver_tracktimecode=' + tf);
+    });
+    if (Lampa.PlayerVideo && Lampa.PlayerVideo.listener) {
+      Lampa.PlayerVideo.listener.follow('timeupdate', function(e) {
+        ticks++;
+        var now = Date.now();
+        if (ticks <= 3 || now - lastLog > 60000) {
+          lastLog = now;
+          var tl = cur && cur.timeline;
+          mzLog('PLAYER','timeupdate #' + ticks + ': current=' + Math.round(e.current) + ', duration=' + e.duration +
+            (tl ? ' | timeline.time=' + tl.time + ', percent=' + tl.percent + ', waiting=' + !!tl.waiting_for_user + ', continued=' + !!tl.continued : ''));
+        }
+      });
+    }
+    Lampa.Player.listener.follow('destroy', function() {
+      var tl = cur && cur.timeline;
+      mzLog('PLAYER','destroy: timeline.time=' + (tl && tl.time) + ', percent=' + (tl && tl.percent) +
+        ' | file_view → ' + mzFileViewRecord(tl && tl.hash) + ' | localStorage ≈ ' + mzStorageKb() + ' КБ');
+      cur = null;
+    });
+    mzPlayerDiagOn = true;
+  } catch(e) {mzLog('PLAYER','діагностика недоступна: ' + e);}
+}
+
 var mzLastCardTap = 0;
 function addCardButton(e) {
   if (!e || e.type !== 'complite' || !window.$) return;
@@ -1390,6 +1447,7 @@ function init() {
     onChange:openMenu
   });
   mzInstallHooks();
+  mzInstallPlayerDiag();
   mzAddRows();
   try {Lampa.Listener.follow('full', addCardButton);} catch(err) {mzLog('CARD','listener error');}
   notice('Mazepa: плагін завантажено');
