@@ -65,7 +65,29 @@ function mzShow(o) {
   try {
     if (Lampa.Select.opened && Lampa.Select.opened()) {wasOpen = true; Lampa.Select.hide();}
   } catch(e) {}
-  mzLog('SELECT','show #' + mzShowCount + ' «' + (o && o.title) + '»' + (wasOpen ? ' (попередній закрито, щоб не накопичувати стек)' : ''));
+  // Lampa не повертає фокус сама: після закриття списку контролер лишається 'select',
+  // і кожен Back повторно закриває той самий список. Запам'ятовуємо контролер-джерело.
+  var prev = 'content';
+  try {
+    var cur = Lampa.Controller.enabled().name;
+    if (cur && cur !== 'select') prev = cur;
+  } catch(e) {}
+  function restore() {
+    try {Lampa.Controller.toggle(prev);} catch(e) {mzLog('BACK','не вдалося повернути контролер ' + prev);}
+  }
+  var origBack = o && o.onBack, origSelect = o && o.onSelect;
+  if (o) {
+    o.onBack = function() {
+      mzLog('BACK','«' + o.title + '» → повернуто контролер ' + prev);
+      restore();
+      if (origBack) return origBack.apply(this, arguments);
+    };
+    if (origSelect) o.onSelect = function() {
+      restore();
+      return origSelect.apply(this, arguments);
+    };
+  }
+  mzLog('SELECT','show #' + mzShowCount + ' «' + (o && o.title) + '», з контролера ' + prev + (wasOpen ? ' (попередній закрито)' : ''));
   Lampa.Select.show(o);
 }
 var mzSearchBusy = false;
@@ -593,7 +615,7 @@ function searchMazepa(query, opts) {
       onSelect:function(item) {
         if (item) requestMazepaTorrent(item);
       },
-      onBack:function(){mzLog('BACK','results list; fromCard=' + !!opts.fromCard);if (!opts.fromCard) openMenu();}
+      onBack:function(){if (!opts.fromCard) openMenu();}
     });
   };
   x.onerror = function(){mzSearchBusy = false;notice('Mazepa: немає зв’язку з Worker');};
